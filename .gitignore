@@ -37,3 +37,6 @@ infinitetalk-api
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Binary output
+infinitetalk-api
