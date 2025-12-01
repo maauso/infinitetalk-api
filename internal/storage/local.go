@@ -54,14 +54,20 @@ func (s *LocalStorage) SaveTemp(ctx context.Context, name string, data io.Reader
 	if err != nil {
 		return "", fmt.Errorf("create temp file: %w", err)
 	}
-	defer f.Close()
 
+	fileName := f.Name()
 	if _, err := io.Copy(f, data); err != nil {
-		os.Remove(f.Name())
+		_ = f.Close()
+		_ = os.Remove(fileName)
 		return "", fmt.Errorf("write temp file: %w", err)
 	}
 
-	return f.Name(), nil
+	if err := f.Close(); err != nil {
+		_ = os.Remove(fileName)
+		return "", fmt.Errorf("close temp file: %w", err)
+	}
+
+	return fileName, nil
 }
 
 // LoadTemp reads a temporary file and returns a reader.

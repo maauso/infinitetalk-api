@@ -14,7 +14,7 @@ import (
 func TestNewLocalStorage(t *testing.T) {
 	t.Run("creates directory if not exists", func(t *testing.T) {
 		tempDir := filepath.Join(os.TempDir(), "infinitetalk_test_"+randomSuffix())
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 
 		storage, err := NewLocalStorage(tempDir)
 		if err != nil {
@@ -58,7 +58,7 @@ func TestLocalStorage_SaveTemp(t *testing.T) {
 		if err != nil {
 			t.Fatalf("SaveTemp() error = %v", err)
 		}
-		defer os.Remove(path)
+		defer func() { _ = os.Remove(path) }()
 
 		if !strings.Contains(path, "test_") {
 			t.Errorf("path %s should contain 'test_'", path)
@@ -93,13 +93,13 @@ func TestLocalStorage_LoadTemp(t *testing.T) {
 		if err != nil {
 			t.Fatalf("SaveTemp() error = %v", err)
 		}
-		defer os.Remove(path)
+		defer func() { _ = os.Remove(path) }()
 
 		reader, err := storage.LoadTemp(ctx, path)
 		if err != nil {
 			t.Fatalf("LoadTemp() error = %v", err)
 		}
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		content, err := io.ReadAll(reader)
 		if err != nil {
@@ -185,7 +185,7 @@ func TestLocalStorage_UploadToS3(t *testing.T) {
 func setupTestStorage(t *testing.T) *LocalStorage {
 	t.Helper()
 	tempDir := filepath.Join(os.TempDir(), "infinitetalk_test_"+randomSuffix())
-	t.Cleanup(func() { os.RemoveAll(tempDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
 
 	storage, err := NewLocalStorage(tempDir)
 	if err != nil {

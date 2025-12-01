@@ -14,7 +14,7 @@ import (
 
 func TestNewS3Storage(t *testing.T) {
 	tempDir := filepath.Join(os.TempDir(), "infinitetalk_s3_test_"+randomSuffix())
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	cfg := S3Config{
 		Bucket:          "test-bucket",
@@ -39,7 +39,7 @@ func TestNewS3Storage(t *testing.T) {
 
 func TestS3Storage_InheritsLocalStorage(t *testing.T) {
 	tempDir := filepath.Join(os.TempDir(), "infinitetalk_s3_test_"+randomSuffix())
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	cfg := S3Config{
 		Bucket:          "test-bucket",
@@ -61,14 +61,14 @@ func TestS3Storage_InheritsLocalStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SaveTemp() error = %v", err)
 	}
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 
 	// Test inherited LoadTemp
 	reader, err := storage.LoadTemp(ctx, path)
 	if err != nil {
 		t.Fatalf("LoadTemp() error = %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
@@ -109,7 +109,7 @@ func TestS3Storage_UploadToS3_MockServer(t *testing.T) {
 	defer server.Close()
 
 	tempDir := filepath.Join(os.TempDir(), "infinitetalk_s3_mock_test_"+randomSuffix())
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	cfg := S3Config{
 		Bucket:          "test-bucket",
