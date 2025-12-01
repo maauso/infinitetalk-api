@@ -66,7 +66,7 @@ func (p *FFmpegProcessor) JoinVideos(ctx context.Context, videoPaths []string, o
 	if err != nil {
 		return fmt.Errorf("create concat list: %w", err)
 	}
-	defer os.Remove(listFile)
+	defer func() { _ = os.Remove(listFile) }()
 
 	// Try fast copy first (no re-encoding)
 	err = p.joinWithCopy(ctx, listFile, output)
@@ -115,7 +115,7 @@ func (p *FFmpegProcessor) createConcatList(videoPaths []string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("create temp file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	for _, path := range videoPaths {
 		// Convert to absolute path for safety
