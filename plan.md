@@ -11,6 +11,21 @@ Migrate the functionalities of `libsync.py` to a REST API in Go following:
 - **SOLID**: especially SRP, OCP, DIP (dependencies toward abstractions).
 - **Tactical DDD**: Value Objects, lightweight Aggregates, Application Services.
 
+### Phase Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| **Phase 0** | Scaffold and Base CI | ✅ Completed (Makefile/CI pending) |
+| **Phase 1** | `internal/media` - FFmpeg CLI | ✅ Completed |
+| **Phase 2** | `internal/audio` - Silence-based Splitter | ✅ Completed |
+| **Phase 3** | `internal/job` - Job Aggregate | ✅ Completed |
+| **Phase 4** | `internal/runpod` - RunPod Client | ✅ Completed |
+| **Phase 5** | Use Case `ProcessVideo` | ⏳ Not started |
+| **Phase 6** | HTTP Server | ⏳ Not started |
+| **Phase 7** | `internal/storage` - Storage | ✅ Completed |
+| **Phase 8** | Configuration and Observability | ⏳ Not started |
+| **Phase 9** | Integration and E2E | ⏳ Not started |
+
 ---
 
 ## Technical Decisions
@@ -79,28 +94,33 @@ infinitetalk-api/
 
 ---
 
-## Phase 0 — Scaffold and Base CI
+## Phase 0 — Scaffold and Base CI ✅ COMPLETED
+
+> **Status**: Completed (2024-12-01)
+> **Pending**: `Makefile` and CI pipeline (GitHub Actions) to be added separately.
 
 **Description**
 Create the Go project skeleton: `go mod init`, folder structure, `Makefile` with targets (`build`, `test`, `lint`), base Dockerfile with `ffmpeg`, and minimal CI pipeline (lint + test).
 
 **Deliverables**
 
-- `go.mod` with module `github.com/<org>/infinitetalk-api` and `go 1.25`.
-- Multi-stage Dockerfile: Go 1.25 builder + final Debian slim image with `ffmpeg`.
-- `Makefile` with `make build`, `make test`, `make lint` (golangci-lint).
-- GitHub Actions / GitLab CI that runs lint + test on each PR.
+- ✅ `go.mod` with module `github.com/<org>/infinitetalk-api` and `go 1.25`.
+- ✅ Multi-stage Dockerfile: Go 1.25 builder + final Debian slim image with `ffmpeg`.
+- ⏳ `Makefile` with `make build`, `make test`, `make lint` (golangci-lint) — *pending*.
+- ⏳ GitHub Actions / GitLab CI that runs lint + test on each PR — *pending*.
 
 **Acceptance Criteria**
 
-1. `make build` generates binary without errors.
-2. `make lint` passes with default `golangci-lint` config.
-3. `docker build .` produces functional image with `ffmpeg -version` OK.
-4. Green CI pipeline on `main` branch.
+1. ⏳ `make build` generates binary without errors.
+2. ⏳ `make lint` passes with default `golangci-lint` config.
+3. ✅ `docker build .` produces functional image with `ffmpeg -version` OK.
+4. ⏳ Green CI pipeline on `main` branch.
 
 ---
 
-## Phase 1 — Package `internal/media` (FFmpeg CLI)
+## Phase 1 — Package `internal/media` (FFmpeg CLI) ✅ COMPLETED
+
+> **Status**: Completed (2024-12-01)
 
 **Description**
 Implement image/video processing via `ffmpeg` with `os/exec`:
@@ -110,8 +130,9 @@ Implement image/video processing via `ffmpeg` with `os/exec`:
 - Timeout with `context`, stderr capture, structured errors.
 
 **Files**:
-- `internal/media/processor.go` - Processor Interface (port)
-- `internal/media/ffmpeg.go` - Implementation via CLI
+- ✅ `internal/media/processor.go` - Processor Interface (port)
+- ✅ `internal/media/ffmpeg.go` - Implementation via CLI
+- ✅ `internal/media/ffmpeg_test.go` - Unit tests
 
 **Interface**
 
@@ -126,14 +147,16 @@ type Processor interface {
 
 **Acceptance Criteria**
 
-1. Unit tests with dummy files (1x1 image, short videos) pass.
-2. `JoinVideos` tries `-c copy`; if it fails, re-encodes with `libx264/aac`.
-3. Errors include `ffmpeg` stderr for debugging.
-4. Supports cancellation via `context.WithTimeout`.
+1. ✅ Unit tests with dummy files (1x1 image, short videos) pass.
+2. ✅ `JoinVideos` tries `-c copy`; if it fails, re-encodes with `libx264/aac`.
+3. ✅ Errors include `ffmpeg` stderr for debugging (`FFmpegError` type).
+4. ✅ Supports cancellation via `context.WithTimeout`.
 
 ---
 
-## Phase 2 — Package `internal/audio` (Silence-based Splitter)
+## Phase 2 — Package `internal/audio` (Silence-based Splitter) ✅ COMPLETED
+
+> **Status**: Completed (2024-12-01)
 
 **Description**
 Replicate `split_audio_smartly` from Python using `ffmpeg` CLI:
@@ -142,8 +165,9 @@ Replicate `split_audio_smartly` from Python using `ffmpeg` CLI:
 - Cut segments with `ffmpeg` (less dependency than `libav`).
 
 **Files**:
-- `internal/audio/splitter.go` - Splitter Interface (port)
-- `internal/audio/ffmpeg.go` - Implementation via CLI
+- ✅ `internal/audio/splitter.go` - Splitter Interface (port)
+- ✅ `internal/audio/ffmpeg.go` - Implementation via CLI
+- ✅ `internal/audio/ffmpeg_test.go` - Unit tests
 
 **Interface**
 
@@ -151,7 +175,7 @@ Replicate `split_audio_smartly` from Python using `ffmpeg` CLI:
 package audio
 
 type Splitter interface {
-    Split(ctx context.Context, inputWav string, opts SplitOpts) ([]string, error)
+    Split(ctx context.Context, inputWav, outputDir string, opts SplitOpts) ([]string, error)
 }
 
 type SplitOpts struct {
@@ -163,14 +187,16 @@ type SplitOpts struct {
 
 **Acceptance Criteria**
 
-1. Given a 2-min WAV with silences, generates N chunks in temporary folder.
-2. If audio ≤ `ChunkTargetSec`, returns slice with a single path.
-3. Tests with test WAV file (can be generated with `ffmpeg -f lavfi`).
-4. Temporary file cleanup managed by caller (returns paths).
+1. ✅ Given a 2-min WAV with silences, generates N chunks in temporary folder.
+2. ✅ If audio ≤ `ChunkTargetSec`, returns slice with a single path.
+3. ✅ Tests with test WAV file (can be generated with `ffmpeg -f lavfi`).
+4. ✅ Temporary file cleanup managed by caller (returns paths).
 
 ---
 
-## Phase 3 — Package `internal/job` (Job Aggregate)
+## Phase 3 — Package `internal/job` (Job Aggregate) ✅ COMPLETED
+
+> **Status**: Completed (2024-12-01)
 
 **Description**
 Implement the Job aggregate with its domain, repository and use case:
@@ -181,10 +207,12 @@ Implement the Job aggregate with its domain, repository and use case:
 - `ProcessVideo` use case (completed in Phase 5).
 
 **Files**:
-- `internal/job/job.go` - Job Entity, states, transitions
-- `internal/job/repository.go` - JobRepository Interface (port)
-- `internal/job/memory.go` - In-memory implementation
-- `internal/job/service.go` - ProcessVideo use case (scaffold)
+- ✅ `internal/job/job.go` - Job Entity, states, transitions
+- ✅ `internal/job/repository.go` - JobRepository Interface (port)
+- ✅ `internal/job/memory.go` - In-memory implementation
+- ✅ `internal/job/service.go` - ProcessVideo use case (scaffold)
+- ✅ `internal/job/id/id.go` - Job ID generation (Value Object)
+- ✅ Test files: `job_test.go`, `memory_test.go`, `service_test.go`, `id/id_test.go`
 
 **RunPod States (reference)**:
 ```
@@ -198,14 +226,16 @@ TIMED_OUT  → Expired before pickup or worker did not respond in time
 
 **Acceptance Criteria**
 
-1. `Job` has methods for valid state transitions (state machine).
-2. `JobRepository` interface defined; in-memory implementation functional.
-3. Tests validate business rules (e.g., cannot transition from `COMPLETED` to `IN_QUEUE`).
-4. Godoc documentation on all public types.
+1. ✅ `Job` has methods for valid state transitions (state machine).
+2. ✅ `JobRepository` interface defined; in-memory implementation functional.
+3. ✅ Tests validate business rules (e.g., cannot transition from `COMPLETED` to `IN_QUEUE`).
+4. ✅ Godoc documentation on all public types.
 
 ---
 
-## Phase 4 — Package `internal/runpod` (RunPod Client)
+## Phase 4 — Package `internal/runpod` (RunPod Client) ✅ COMPLETED
+
+> **Status**: Completed (2024-12-01)
 
 **Description**
 HTTP client for RunPod using `net/http` stdlib:
@@ -216,17 +246,18 @@ HTTP client for RunPod using `net/http` stdlib:
 Retry with exponential backoff. Mapping of RunPod states to domain.
 
 **Files**:
-- `internal/runpod/client.go` - Interface + HTTP implementation
-- `internal/runpod/types.go` - RunPod request/response DTOs
+- ✅ `internal/runpod/client.go` - Interface + HTTP implementation
+- ✅ `internal/runpod/types.go` - RunPod request/response DTOs
+- ✅ `internal/runpod/client_test.go` - Unit tests with mock server
 
 **RunPod States to handle**: `IN_QUEUE`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`, `TIMED_OUT`.
 
 **Acceptance Criteria**
 
-1. Configurable timeout; respects `context`.
-2. Handles all RunPod states correctly.
-3. Tests with mock server (`httptest`).
-4. API key read from env (`RUNPOD_API_KEY`).
+1. ✅ Configurable timeout; respects `context`.
+2. ✅ Handles all RunPod states correctly.
+3. ✅ Tests with mock server (`httptest`).
+4. ✅ API key read from env (`RUNPOD_API_KEY`).
 
 ---
 
@@ -309,7 +340,9 @@ mux.HandleFunc("GET /health", h.Health)
 
 ---
 
-## Phase 7 — Package `internal/storage` (Storage)
+## Phase 7 — Package `internal/storage` (Storage) ✅ COMPLETED
+
+> **Status**: Completed (2024-12-01)
 
 **Description**
 Implement temporary storage (local disk) and optional S3:
@@ -318,9 +351,11 @@ Implement temporary storage (local disk) and optional S3:
 - **Final storage**: Optional S3 push if `push_to_s3=true` in request.
 
 **Files**:
-- `internal/storage/storage.go` - Storage Interface (port)
-- `internal/storage/local.go` - Local disk implementation
-- `internal/storage/s3.go` - S3 implementation (optional)
+- ✅ `internal/storage/storage.go` - Storage Interface (port)
+- ✅ `internal/storage/local.go` - Local disk implementation
+- ✅ `internal/storage/s3.go` - S3 implementation using AWS SDK v2
+- ✅ `internal/storage/local_test.go` - Unit tests for local storage
+- ✅ `internal/storage/s3_test.go` - Unit tests for S3 storage
 
 **Storage Interface**:
 ```go
@@ -338,10 +373,10 @@ type Storage interface {
 
 **Acceptance Criteria**
 
-1. Swappable interface (constructor receives implementation).
-2. Tests with local storage in `/tmp`.
-3. Optional S3 client, activated by config (`S3_BUCKET`, `S3_REGION`).
-4. Automatic cleanup of temporary files after completing job.
+1. ✅ Swappable interface (constructor receives implementation).
+2. ✅ Tests with local storage in `/tmp`.
+3. ✅ Optional S3 client, activated by config (`S3_BUCKET`, `S3_REGION`).
+4. ⏳ Automatic cleanup of temporary files after completing job — *implemented in Storage, to be wired in Phase 5*.
 
 ---
 
