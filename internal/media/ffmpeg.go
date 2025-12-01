@@ -139,7 +139,7 @@ func (p *FFmpegProcessor) copyFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("read source file: %w", err)
 	}
-	if err := os.WriteFile(dst, input, 0644); err != nil {
+	if err := os.WriteFile(dst, input, 0600); err != nil {
 		return fmt.Errorf("write destination file: %w", err)
 	}
 	return nil

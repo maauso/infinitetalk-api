@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -190,12 +191,9 @@ func TestResizeImageWithPadding(t *testing.T) {
 
 		createTestImage(t, src, 100, 100)
 
-		// Create context with very short timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+		// Create context that's already expired by using a deadline in the past
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-1*time.Second))
 		defer cancel()
-
-		// Wait for timeout to expire
-		time.Sleep(1 * time.Millisecond)
 
 		err := p.ResizeImageWithPadding(ctx, src, dst, 64, 64)
 		if err == nil {
@@ -328,10 +326,10 @@ func TestFFmpegError(t *testing.T) {
 	}
 
 	// Verify error contains key information
-	if !contains(errStr, "exit status 1") {
+	if !strings.Contains(errStr, "exit status 1") {
 		t.Error("Error() should contain underlying error")
 	}
-	if !contains(errStr, "Error opening input file") {
+	if !strings.Contains(errStr, "Error opening input file") {
 		t.Error("Error() should contain stderr")
 	}
 
@@ -393,17 +391,4 @@ func getVideoDuration(t *testing.T, path string) float64 {
 	}
 
 	return duration
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
