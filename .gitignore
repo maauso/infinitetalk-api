@@ -9,6 +9,9 @@
 *.dylib
 infinitetalk-api
 
+# Main binary
+infinitetalk-api
+
 # Test binary, built with `go test -c`
 *.test
 
