@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -716,11 +717,11 @@ func TestProcessVideoService_Process_MultipleChunks(t *testing.T) {
 
 	// Create chunk files
 	for i := 0; i < 3; i++ {
-		_ = os.WriteFile("/tmp/chunk_"+string(rune('0'+i))+".wav", audioData, 0644)
+		_ = os.WriteFile(fmt.Sprintf("/tmp/chunk_%d.wav", i), audioData, 0644)
 	}
 	defer func() {
 		for i := 0; i < 3; i++ {
-			os.Remove("/tmp/chunk_" + string(rune('0'+i)) + ".wav")
+			os.Remove(fmt.Sprintf("/tmp/chunk_%d.wav", i))
 		}
 	}()
 
