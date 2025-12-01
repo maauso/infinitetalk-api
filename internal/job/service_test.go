@@ -101,7 +101,10 @@ func TestProcessVideoService_GetJob(t *testing.T) {
 	ctx := context.Background()
 
 	// Create job first
-	created, _ := svc.CreateJob(ctx, ProcessVideoInput{Width: 512, Height: 512})
+	created, err := svc.CreateJob(ctx, ProcessVideoInput{Width: 512, Height: 512})
+	if err != nil {
+		t.Fatalf("failed to create job: %v", err)
+	}
 
 	// Get job
 	found, err := svc.GetJob(ctx, created.ID)

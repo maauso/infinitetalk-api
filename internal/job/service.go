@@ -76,6 +76,10 @@ func (s *ProcessVideoService) SetMaxConcurrentChunks(n int) {
 
 // CreateJob creates a new job and persists it to the repository.
 // The job is created in IN_QUEUE status, ready for processing.
+//
+// Note: ImageBase64 and AudioBase64 from input are not stored directly in the Job.
+// They will be decoded and saved as files during processing (Phase 5), and the
+// resulting file paths will be stored in InputImagePath and InputAudioPath.
 func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoInput) (*Job, error) {
 	job := New()
 	job.Width = input.Width
