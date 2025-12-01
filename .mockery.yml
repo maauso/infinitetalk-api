@@ -1,0 +1,30 @@
+all: false
+dir: '{{.InterfaceDir}}'
+filename: mocks_test.go
+force-file-write: true
+formatter: goimports
+generate: true
+include-auto-generated: false
+log-level: info
+structname: 'Mock{{.InterfaceName}}'
+pkgname: '{{.SrcPackageName}}'
+recursive: false
+require-template-schema-exists: true
+template: testify
+template-schema: '{{.Template}}.schema.json'
+packages:
+  github.com/maauso/infinitetalk-api/internal/media:
+    config:
+      all: true
+  github.com/maauso/infinitetalk-api/internal/audio:
+    config:
+      all: true
+  github.com/maauso/infinitetalk-api/internal/runpod:
+    config:
+      all: true
+  github.com/maauso/infinitetalk-api/internal/storage:
+    config:
+      all: true
+  github.com/maauso/infinitetalk-api/internal/job:
+    config:
+      all: true
