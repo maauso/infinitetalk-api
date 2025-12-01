@@ -285,9 +285,9 @@ func (s *FFmpegSplitter) extractChunks(ctx context.Context, inputPath, outputDir
 		outputPath := filepath.Join(outputDir, fmt.Sprintf("chunk_%03d.wav", i))
 
 		if err := s.extractSegment(ctx, inputPath, outputPath, seg[0], seg[1]-seg[0]); err != nil {
-			// Cleanup already created chunks on error
+			// Cleanup already created chunks on error (best-effort, ignore errors)
 			for _, chunk := range chunks {
-				os.Remove(chunk)
+				_ = os.Remove(chunk)
 			}
 			return nil, fmt.Errorf("extract segment %d: %w", i, err)
 		}
