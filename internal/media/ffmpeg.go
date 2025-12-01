@@ -3,11 +3,20 @@ package media
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+)
+
+// Static errors for media operations.
+var (
+	// ErrInvalidDimensions is returned when the provided dimensions are not positive.
+	ErrInvalidDimensions = errors.New("invalid dimensions: width and height must be positive")
+	// ErrNoVideoPaths is returned when no video paths are provided for joining.
+	ErrNoVideoPaths = errors.New("no video paths provided")
 )
 
 // FFmpegProcessor implements Processor using the ffmpeg CLI.
@@ -29,7 +38,7 @@ func NewFFmpegProcessor(ffmpegPath string) *FFmpegProcessor {
 // maintaining aspect ratio. Black padding is added to fill any remaining space.
 func (p *FFmpegProcessor) ResizeImageWithPadding(ctx context.Context, src, dst string, w, h int) error {
 	if w <= 0 || h <= 0 {
-		return fmt.Errorf("invalid dimensions: width=%d, height=%d must be positive", w, h)
+		return fmt.Errorf("%w: width=%d, height=%d", ErrInvalidDimensions, w, h)
 	}
 
 	// FFmpeg filter to scale with aspect ratio preservation and add black padding
@@ -53,7 +62,7 @@ func (p *FFmpegProcessor) ResizeImageWithPadding(ctx context.Context, src, dst s
 // with libx264/aac if the copy fails.
 func (p *FFmpegProcessor) JoinVideos(ctx context.Context, videoPaths []string, output string) error {
 	if len(videoPaths) == 0 {
-		return fmt.Errorf("no video paths provided")
+		return ErrNoVideoPaths
 	}
 
 	if len(videoPaths) == 1 {
@@ -135,7 +144,7 @@ func (p *FFmpegProcessor) createConcatList(videoPaths []string) (string, error) 
 
 // copyFile copies a file from src to dst.
 func (p *FFmpegProcessor) copyFile(src, dst string) error {
-	input, err := os.ReadFile(src)
+	input, err := os.ReadFile(src) // #nosec G304 - src is provided by trusted internal code
 	if err != nil {
 		return fmt.Errorf("read source file: %w", err)
 	}
@@ -148,6 +157,7 @@ func (p *FFmpegProcessor) copyFile(src, dst string) error {
 // runFFmpeg executes ffmpeg with the given arguments and returns an error
 // containing stderr output if the command fails.
 func (p *FFmpegProcessor) runFFmpeg(ctx context.Context, args []string) error {
+	// #nosec G204 - ffmpegPath is set by the application, not user input
 	cmd := exec.CommandContext(ctx, p.ffmpegPath, args...)
 
 	var stderr bytes.Buffer

@@ -3,6 +3,7 @@ package audio
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,20 @@ import (
 	"strconv"
 	"strings"
 )
+
+// Static errors for audio operations.
+var (
+	// ErrInputNotFound is returned when the input file does not exist.
+	ErrInputNotFound = errors.New("input file does not exist")
+	// ErrParseDuration is returned when the duration cannot be parsed from ffmpeg output.
+	ErrParseDuration = errors.New("could not parse duration from ffmpeg output")
+)
+
+// SilenceInterval represents a detected silence interval in the audio.
+type SilenceInterval struct {
+	Start float64
+	End   float64
+}
 
 // FFmpegSplitter implements Splitter using ffmpeg CLI.
 type FFmpegSplitter struct {
@@ -27,17 +42,11 @@ func NewFFmpegSplitter(ffmpegPath string) *FFmpegSplitter {
 	return &FFmpegSplitter{ffmpegPath: ffmpegPath}
 }
 
-// silenceInterval represents a detected silence interval in the audio.
-type silenceInterval struct {
-	start float64
-	end   float64
-}
-
 // Split implements Splitter.Split using ffmpeg silencedetect and segment extraction.
 func (s *FFmpegSplitter) Split(ctx context.Context, inputWav, outputDir string, opts SplitOpts) ([]string, error) {
 	// Validate input file exists
 	if _, err := os.Stat(inputWav); os.IsNotExist(err) {
-		return nil, fmt.Errorf("input file does not exist: %s", inputWav)
+		return nil, fmt.Errorf("%w: %s", ErrInputNotFound, inputWav)
 	}
 
 	// Get audio duration
@@ -75,6 +84,7 @@ func (s *FFmpegSplitter) Split(ctx context.Context, inputWav, outputDir string, 
 
 // getAudioDuration returns the duration of an audio file in seconds.
 func (s *FFmpegSplitter) getAudioDuration(ctx context.Context, inputPath string) (float64, error) {
+	// #nosec G204 - ffmpegPath is set by the application, not user input
 	cmd := exec.CommandContext(ctx, s.ffmpegPath,
 		"-i", inputPath,
 		"-hide_banner",
@@ -95,7 +105,7 @@ func (s *FFmpegSplitter) getAudioDuration(ctx context.Context, inputPath string)
 	re := regexp.MustCompile(`Duration:\s*(\d+):(\d+):(\d+)\.(\d+)`)
 	matches := re.FindStringSubmatch(output)
 	if len(matches) < 5 {
-		return 0, fmt.Errorf("could not parse duration from ffmpeg output: %s", output)
+		return 0, fmt.Errorf("%w: %s", ErrParseDuration, output)
 	}
 
 	hours, _ := strconv.ParseFloat(matches[1], 64)
@@ -113,13 +123,14 @@ func (s *FFmpegSplitter) getAudioDuration(ctx context.Context, inputPath string)
 }
 
 // detectSilences uses ffmpeg silencedetect to find silence intervals.
-func (s *FFmpegSplitter) detectSilences(ctx context.Context, inputPath string, opts SplitOpts) ([]silenceInterval, error) {
+func (s *FFmpegSplitter) detectSilences(ctx context.Context, inputPath string, opts SplitOpts) ([]SilenceInterval, error) {
 	// Build silencedetect filter
 	filter := fmt.Sprintf("silencedetect=noise=%ddB:d=%f",
 		int(opts.SilenceThreshDb),
 		float64(opts.MinSilenceMs)/1000.0,
 	)
 
+	// #nosec G204 - ffmpegPath is set by the application, not user input
 	cmd := exec.CommandContext(ctx, s.ffmpegPath,
 		"-i", inputPath,
 		"-af", filter,
@@ -139,8 +150,8 @@ func (s *FFmpegSplitter) detectSilences(ctx context.Context, inputPath string, o
 }
 
 // parseSilenceOutput parses ffmpeg silencedetect output.
-func parseSilenceOutput(output string) ([]silenceInterval, error) {
-	var intervals []silenceInterval
+func parseSilenceOutput(output string) ([]SilenceInterval, error) {
+	var intervals []SilenceInterval
 
 	// Regex patterns for silence start and end
 	startRe := regexp.MustCompile(`silence_start:\s*([\d.]+)`)
@@ -165,9 +176,9 @@ func parseSilenceOutput(output string) ([]silenceInterval, error) {
 			if err != nil {
 				continue
 			}
-			intervals = append(intervals, silenceInterval{
-				start: currentStart,
-				end:   val,
+			intervals = append(intervals, SilenceInterval{
+				Start: currentStart,
+				End:   val,
 			})
 			hasStart = false
 		}
@@ -177,7 +188,7 @@ func parseSilenceOutput(output string) ([]silenceInterval, error) {
 }
 
 // calculateSplitPoints determines optimal split points based on silence intervals.
-func (s *FFmpegSplitter) calculateSplitPoints(silences []silenceInterval, totalDuration float64, targetSec int) []float64 {
+func (s *FFmpegSplitter) calculateSplitPoints(silences []SilenceInterval, totalDuration float64, targetSec int) []float64 {
 	if len(silences) == 0 {
 		// No silences detected, split at fixed intervals
 		return s.fixedSplitPoints(totalDuration, targetSec)
@@ -194,7 +205,7 @@ func (s *FFmpegSplitter) calculateSplitPoints(silences []silenceInterval, totalD
 
 		if bestSilence != nil {
 			// Split at the middle of the silence
-			splitPoint := (bestSilence.start + bestSilence.end) / 2
+			splitPoint := (bestSilence.Start + bestSilence.End) / 2
 			if splitPoint > lastSplit+1 { // Ensure some minimum chunk size
 				splitPoints = append(splitPoints, splitPoint)
 				lastSplit = splitPoint
@@ -230,13 +241,13 @@ func (s *FFmpegSplitter) fixedSplitPoints(totalDuration float64, targetSec int) 
 }
 
 // findBestSilence finds the silence interval closest to the ideal point within tolerance.
-func findBestSilence(silences []silenceInterval, idealPoint, tolerance float64) *silenceInterval {
-	var best *silenceInterval
+func findBestSilence(silences []SilenceInterval, idealPoint, tolerance float64) *SilenceInterval {
+	var best *SilenceInterval
 	bestDistance := tolerance
 
 	for i := range silences {
 		// Use the middle of the silence as reference
-		silenceMiddle := (silences[i].start + silences[i].end) / 2
+		silenceMiddle := (silences[i].Start + silences[i].End) / 2
 
 		// Only consider silences after some minimum point
 		if silenceMiddle < idealPoint-tolerance {
@@ -266,12 +277,12 @@ func abs(x float64) float64 {
 // extractChunks creates audio chunk files based on split points.
 func (s *FFmpegSplitter) extractChunks(ctx context.Context, inputPath, outputDir string, splitPoints []float64, totalDuration float64) ([]string, error) {
 	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return nil, fmt.Errorf("create output directory: %w", err)
 	}
 
 	// Build segment boundaries
-	var segments [][2]float64
+	segments := make([][2]float64, 0, len(splitPoints)+1)
 	start := 0.0
 	for _, point := range splitPoints {
 		segments = append(segments, [2]float64{start, point})
@@ -280,7 +291,7 @@ func (s *FFmpegSplitter) extractChunks(ctx context.Context, inputPath, outputDir
 	// Add final segment
 	segments = append(segments, [2]float64{start, totalDuration})
 
-	var chunks []string
+	chunks := make([]string, 0, len(segments))
 	for i, seg := range segments {
 		outputPath := filepath.Join(outputDir, fmt.Sprintf("chunk_%03d.wav", i))
 
@@ -309,6 +320,7 @@ func (s *FFmpegSplitter) extractSegment(ctx context.Context, inputPath, outputPa
 		outputPath,
 	}
 
+	// #nosec G204 - ffmpegPath is set by the application, not user input
 	cmd := exec.CommandContext(ctx, s.ffmpegPath, args...)
 
 	var stderr bytes.Buffer
@@ -324,10 +336,11 @@ func (s *FFmpegSplitter) extractSegment(ctx context.Context, inputPath, outputPa
 // copyAudio copies an audio file to a new location.
 func (s *FFmpegSplitter) copyAudio(ctx context.Context, src, dst string) error {
 	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0750); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
 
+	// #nosec G204 - ffmpegPath is set by the application, not user input
 	cmd := exec.CommandContext(ctx, s.ffmpegPath,
 		"-y",
 		"-i", src,
@@ -347,7 +360,7 @@ func (s *FFmpegSplitter) copyAudio(ctx context.Context, src, dst string) error {
 
 // GetSilences is a utility function to get silence intervals from an audio file.
 // This can be useful for debugging or testing.
-func (s *FFmpegSplitter) GetSilences(ctx context.Context, inputPath string, opts SplitOpts) ([]silenceInterval, error) {
+func (s *FFmpegSplitter) GetSilences(ctx context.Context, inputPath string, opts SplitOpts) ([]SilenceInterval, error) {
 	return s.detectSilences(ctx, inputPath, opts)
 }
 
@@ -355,7 +368,7 @@ func (s *FFmpegSplitter) GetSilences(ctx context.Context, inputPath string, opts
 func ListChunks(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read directory: %w", err)
 	}
 
 	var chunks []string
