@@ -11,6 +11,17 @@ import (
 	"time"
 )
 
+// setTestEnv sets the RUNPOD_API_KEY env var and returns a cleanup function.
+func setTestEnv(t *testing.T) {
+	t.Helper()
+	if err := os.Setenv("RUNPOD_API_KEY", "test-key"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Unsetenv("RUNPOD_API_KEY")
+	})
+}
+
 func TestStatus_IsTerminal(t *testing.T) {
 	tests := []struct {
 		status   Status
@@ -55,9 +66,7 @@ func TestDefaultSubmitOptions(t *testing.T) {
 }
 
 func TestNewClient_MissingEndpointID(t *testing.T) {
-	// Temporarily set API key
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	_, err := NewClient("")
 	if err == nil {
@@ -67,7 +76,7 @@ func TestNewClient_MissingEndpointID(t *testing.T) {
 
 func TestNewClient_MissingAPIKey(t *testing.T) {
 	// Ensure API key is not set
-	os.Unsetenv("RUNPOD_API_KEY")
+	_ = os.Unsetenv("RUNPOD_API_KEY")
 
 	_, err := NewClient("test-endpoint")
 	if err == nil {
@@ -76,8 +85,7 @@ func TestNewClient_MissingAPIKey(t *testing.T) {
 }
 
 func TestNewClient_Success(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	client, err := NewClient("test-endpoint")
 	if err != nil {
@@ -89,8 +97,7 @@ func TestNewClient_Success(t *testing.T) {
 }
 
 func TestSubmit_Success(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request
@@ -117,7 +124,7 @@ func TestSubmit_Success(t *testing.T) {
 		}
 
 		// Return success response
-		json.NewEncoder(w).Encode(runResponse{ID: "job-123"})
+		_ = json.NewEncoder(w).Encode(runResponse{ID: "job-123"})
 	}))
 	defer server.Close()
 
@@ -133,11 +140,10 @@ func TestSubmit_Success(t *testing.T) {
 }
 
 func TestSubmit_Error(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(runResponse{Error: "invalid input"})
+		_ = json.NewEncoder(w).Encode(runResponse{Error: "invalid input"})
 	}))
 	defer server.Close()
 
@@ -150,8 +156,7 @@ func TestSubmit_Error(t *testing.T) {
 }
 
 func TestSubmit_ContextCancelled(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(5 * time.Second) // Simulate slow response
@@ -170,8 +175,7 @@ func TestSubmit_ContextCancelled(t *testing.T) {
 }
 
 func TestPoll_AllStatuses(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	tests := []struct {
 		name           string
@@ -228,7 +232,7 @@ func TestPoll_AllStatuses(t *testing.T) {
 				if r.Method != http.MethodGet {
 					t.Errorf("expected GET, got %s", r.Method)
 				}
-				json.NewEncoder(w).Encode(tt.response)
+				_ = json.NewEncoder(w).Encode(tt.response)
 			}))
 			defer server.Close()
 
@@ -252,8 +256,7 @@ func TestPoll_AllStatuses(t *testing.T) {
 }
 
 func TestPoll_EmptyJobID(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	client, _ := NewClient("test-endpoint")
 
@@ -264,8 +267,7 @@ func TestPoll_EmptyJobID(t *testing.T) {
 }
 
 func TestRetry_TransientFailure(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	var attempts int32
 
@@ -274,11 +276,11 @@ func TestRetry_TransientFailure(t *testing.T) {
 		if count < 3 {
 			// First two attempts fail with 503
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte("service unavailable"))
+			_, _ = w.Write([]byte("service unavailable"))
 			return
 		}
 		// Third attempt succeeds
-		json.NewEncoder(w).Encode(statusResponse{ID: "job-1", Status: "COMPLETED"})
+		_ = json.NewEncoder(w).Encode(statusResponse{ID: "job-1", Status: "COMPLETED"})
 	}))
 	defer server.Close()
 
@@ -301,12 +303,11 @@ func TestRetry_TransientFailure(t *testing.T) {
 }
 
 func TestRetry_MaxRetriesExceeded(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte("service unavailable"))
+		_, _ = w.Write([]byte("service unavailable"))
 	}))
 	defer server.Close()
 
@@ -323,15 +324,14 @@ func TestRetry_MaxRetriesExceeded(t *testing.T) {
 }
 
 func TestRetry_NonRetryableError(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	var attempts int32
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&attempts, 1)
 		w.WriteHeader(http.StatusBadRequest) // 400 is not retryable
-		w.Write([]byte("bad request"))
+		_, _ = w.Write([]byte("bad request"))
 	}))
 	defer server.Close()
 
@@ -351,8 +351,7 @@ func TestRetry_NonRetryableError(t *testing.T) {
 }
 
 func TestRetry_RateLimited(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	var attempts int32
 
@@ -360,10 +359,10 @@ func TestRetry_RateLimited(t *testing.T) {
 		count := atomic.AddInt32(&attempts, 1)
 		if count < 2 {
 			w.WriteHeader(http.StatusTooManyRequests) // 429 is retryable
-			w.Write([]byte("rate limited"))
+			_, _ = w.Write([]byte("rate limited"))
 			return
 		}
-		json.NewEncoder(w).Encode(statusResponse{ID: "job-1", Status: "COMPLETED"})
+		_ = json.NewEncoder(w).Encode(statusResponse{ID: "job-1", Status: "COMPLETED"})
 	}))
 	defer server.Close()
 
@@ -383,8 +382,7 @@ func TestRetry_RateLimited(t *testing.T) {
 }
 
 func TestWithHTTPClient(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	customClient := &http.Client{Timeout: 60 * time.Second}
 	client, err := NewClient("test-endpoint", WithHTTPClient(customClient))
@@ -397,14 +395,13 @@ func TestWithHTTPClient(t *testing.T) {
 }
 
 func TestSubmit_DefaultOptions(t *testing.T) {
-	os.Setenv("RUNPOD_API_KEY", "test-key")
-	defer os.Unsetenv("RUNPOD_API_KEY")
+	setTestEnv(t)
 
 	var receivedReq runRequest
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewDecoder(r.Body).Decode(&receivedReq)
-		json.NewEncoder(w).Encode(runResponse{ID: "job-123"})
+		_ = json.NewDecoder(r.Body).Decode(&receivedReq)
+		_ = json.NewEncoder(w).Encode(runResponse{ID: "job-123"})
 	}))
 	defer server.Close()
 
