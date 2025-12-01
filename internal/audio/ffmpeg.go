@@ -1,7 +1,6 @@
 package audio
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -85,8 +84,10 @@ func (s *FFmpegSplitter) getAudioDuration(ctx context.Context, inputPath string)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	// ffmpeg writes duration info to stderr
-	_ = cmd.Run() // Ignore error as ffmpeg exits with error when output is null
+	// ffmpeg writes duration info to stderr and exits with error code when output is null.
+	// We capture stderr to extract duration regardless of exit code, but we still check
+	// if we can parse the duration (missing duration indicates an actual error).
+	_ = cmd.Run()
 
 	// Parse duration from stderr
 	// Looking for: "Duration: HH:MM:SS.ms"
@@ -130,8 +131,9 @@ func (s *FFmpegSplitter) detectSilences(ctx context.Context, inputPath string, o
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	// ffmpeg writes silencedetect output to stderr
-	_ = cmd.Run() // Ignore error as ffmpeg exits with error when output is null
+	// ffmpeg writes silencedetect output to stderr and exits with error when output is null.
+	// We capture stderr to extract silence intervals regardless of exit code.
+	_ = cmd.Run()
 
 	return parseSilenceOutput(stderr.String())
 }
@@ -369,43 +371,3 @@ func ListChunks(dir string) ([]string, error) {
 
 // Verify interface implementation at compile time.
 var _ Splitter = (*FFmpegSplitter)(nil)
-
-// parseSilenceDetectOutput is an alternative parser using bufio for efficiency.
-func parseSilenceDetectOutput(output string) ([]silenceInterval, error) {
-	var intervals []silenceInterval
-	scanner := bufio.NewScanner(strings.NewReader(output))
-
-	var currentStart float64
-	hasStart := false
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if strings.Contains(line, "silence_start:") {
-			parts := strings.Split(line, "silence_start:")
-			if len(parts) > 1 {
-				val, err := strconv.ParseFloat(strings.TrimSpace(strings.Fields(parts[1])[0]), 64)
-				if err == nil {
-					currentStart = val
-					hasStart = true
-				}
-			}
-		}
-
-		if strings.Contains(line, "silence_end:") && hasStart {
-			parts := strings.Split(line, "silence_end:")
-			if len(parts) > 1 {
-				val, err := strconv.ParseFloat(strings.TrimSpace(strings.Fields(parts[1])[0]), 64)
-				if err == nil {
-					intervals = append(intervals, silenceInterval{
-						start: currentStart,
-						end:   val,
-					})
-					hasStart = false
-				}
-			}
-		}
-	}
-
-	return intervals, scanner.Err()
-}

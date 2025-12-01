@@ -2,9 +2,11 @@ package audio
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -78,9 +80,9 @@ func createTestWAV(t *testing.T, outputPath string, durationSec float64, silence
 	// Build concat filter
 	var concatInputs string
 	for i := 0; i < partIndex; i++ {
-		concatInputs += "[" + string('0'+byte(i)) + ":a]"
+		concatInputs += "[" + strconv.Itoa(i) + ":a]"
 	}
-	concatFilter := concatInputs + "concat=n=" + formatInt(partIndex) + ":v=0:a=1[out]"
+	concatFilter := concatInputs + "concat=n=" + strconv.Itoa(partIndex) + ":v=0:a=1[out]"
 
 	args := append(filterParts,
 		"-filter_complex", concatFilter,
@@ -97,46 +99,13 @@ func createTestWAV(t *testing.T, outputPath string, durationSec float64, silence
 }
 
 func formatDuration(sec float64) string {
-	return formatFloat(sec)
+	// Format with 3 decimal places for ffmpeg
+	return fmt.Sprintf("%.3f", sec)
 }
 
-func formatFloat(f float64) string {
-	// Format with enough precision
-	s := ""
-	if f < 0 {
-		s = "-"
-		f = -f
-	}
-	i := int(f)
-	d := int((f - float64(i)) * 1000)
-	if d == 0 {
-		return s + formatInt(i)
-	}
-	return s + formatInt(i) + "." + formatIntPadded(d, 3)
-}
-
-func formatInt(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	s := ""
-	for i > 0 {
-		s = string('0'+byte(i%10)) + s
-		i /= 10
-	}
-	return s
-}
-
-func formatIntPadded(i, width int) string {
-	s := formatInt(i)
-	for len(s) < width {
-		s = "0" + s
-	}
-	// Trim trailing zeros
-	for len(s) > 1 && s[len(s)-1] == '0' {
-		s = s[:len(s)-1]
-	}
-	return s
+func formatChunkName(i int) string {
+	// Zero-padded to 3 digits
+	return fmt.Sprintf("chunk_%03d.wav", i)
 }
 
 func TestFFmpegSplitter_ShortAudio(t *testing.T) {
@@ -224,15 +193,6 @@ func TestFFmpegSplitter_LongAudioWithSilences(t *testing.T) {
 			t.Errorf("chunk %d has unexpected name: got %s, want %s", i, chunk, expectedName)
 		}
 	}
-}
-
-func formatChunkName(i int) string {
-	// Zero-padded to 3 digits
-	s := formatInt(i)
-	for len(s) < 3 {
-		s = "0" + s
-	}
-	return "chunk_" + s + ".wav"
 }
 
 func TestFFmpegSplitter_NoSilences(t *testing.T) {
