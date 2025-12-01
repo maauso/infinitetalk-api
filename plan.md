@@ -20,7 +20,7 @@ Migrate the functionalities of `libsync.py` to a REST API in Go following:
 | **Phase 2** | `internal/audio` - Silence-based Splitter | ✅ Completed |
 | **Phase 3** | `internal/job` - Job Aggregate | ✅ Completed |
 | **Phase 4** | `internal/runpod` - RunPod Client | ✅ Completed |
-| **Phase 5** | Use Case `ProcessVideo` | ⏳ Not started |
+| **Phase 5** | Use Case `ProcessVideo` | ✅ Completed |
 | **Phase 6** | HTTP Server | ⏳ Not started |
 | **Phase 7** | `internal/storage` - Storage | ✅ Completed |
 | **Phase 8** | Configuration and Observability | ⏳ Not started |
@@ -261,7 +261,9 @@ Retry with exponential backoff. Mapping of RunPod states to domain.
 
 ---
 
-## Phase 5 — Use Case `ProcessVideo` (`internal/job/service.go`)
+## Phase 5 — Use Case `ProcessVideo` (`internal/job/service.go`) ✅ COMPLETED
+
+> **Status**: Completed (2025-12-01)
 
 **Description**
 Complete `ProcessVideoService` in `internal/job/service.go` that orchestrates:
@@ -275,12 +277,16 @@ Complete `ProcessVideoService` in `internal/job/service.go` that orchestrates:
 
 **Dependencies**: `media.Processor`, `audio.Splitter`, `runpod.Client`, `storage.Storage`, `JobRepository`.
 
+**Files**:
+- ✅ `internal/job/service.go` - ProcessVideoService use case implementation
+- ✅ `internal/job/service_test.go` - Comprehensive tests with mocks
+
 **Acceptance Criteria**
 
-1. Limited concurrency (configurable, e.g., 3 workers).
-2. If a chunk fails, mark `Job` as `FAILED` and stop.
-3. Emits structured logs (`slog`) for progress.
-4. Tests with mocks of all dependencies.
+1. ✅ Limited concurrency (configurable, e.g., 3 workers).
+2. ✅ If a chunk fails, mark `Job` as `FAILED` and stop.
+3. ✅ Emits structured logs (`slog`) for progress.
+4. ✅ Tests with mocks of all dependencies.
 
 ---
 
