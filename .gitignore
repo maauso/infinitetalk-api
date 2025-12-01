@@ -8,6 +8,10 @@ infinitetalk-api
 *.dll
 *.so
 *.dylib
+infinitetalk-api
+
+# Main binary
+infinitetalk-api
 
 # Test binary, built with `go test -c`
 *.test
@@ -28,6 +32,12 @@ go.work.sum
 # env file
 .env
 
+# Project binary
+infinitetalk-api
+
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Binary output
+infinitetalk-api
