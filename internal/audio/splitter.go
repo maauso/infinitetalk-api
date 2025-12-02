@@ -15,10 +15,10 @@ type SplitOpts struct {
 	// Default: 500 milliseconds.
 	MinSilenceMs int
 
-	// SilenceThreshDb is the volume threshold in dBFS below which
+	// SilenceThreshDB is the volume threshold in dBFS below which
 	// audio is considered silence.
 	// Default: -40 dBFS.
-	SilenceThreshDb float64
+	SilenceThreshDB float64
 }
 
 // DefaultSplitOpts returns the default options for audio splitting.
@@ -26,7 +26,7 @@ func DefaultSplitOpts() SplitOpts {
 	return SplitOpts{
 		ChunkTargetSec:  45,
 		MinSilenceMs:    500,
-		SilenceThreshDb: -40,
+		SilenceThreshDB: -40,
 	}
 }
 

@@ -122,7 +122,7 @@ func TestFFmpegSplitter_ShortAudio(t *testing.T) {
 	opts := SplitOpts{
 		ChunkTargetSec:  45,
 		MinSilenceMs:    500,
-		SilenceThreshDb: -40,
+		SilenceThreshDB: -40,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -163,7 +163,7 @@ func TestFFmpegSplitter_LongAudioWithSilences(t *testing.T) {
 	opts := SplitOpts{
 		ChunkTargetSec:  45,
 		MinSilenceMs:    500,
-		SilenceThreshDb: -40,
+		SilenceThreshDB: -40,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -210,7 +210,7 @@ func TestFFmpegSplitter_NoSilences(t *testing.T) {
 	opts := SplitOpts{
 		ChunkTargetSec:  45,
 		MinSilenceMs:    500,
-		SilenceThreshDb: -40,
+		SilenceThreshDB: -40,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -276,8 +276,8 @@ func TestDefaultSplitOpts(t *testing.T) {
 	if opts.MinSilenceMs != 500 {
 		t.Errorf("MinSilenceMs: got %d, want 500", opts.MinSilenceMs)
 	}
-	if opts.SilenceThreshDb != -40 {
-		t.Errorf("SilenceThreshDb: got %f, want -40", opts.SilenceThreshDb)
+	if opts.SilenceThreshDB != -40 {
+		t.Errorf("SilenceThreshDB: got %f, want -40", opts.SilenceThreshDB)
 	}
 }
 
@@ -300,15 +300,15 @@ func TestParseSilenceOutput(t *testing.T) {
 	}
 
 	// Check first interval
-	if intervals[0].start != 10.5 || intervals[0].end != 11.2 {
+	if intervals[0].Start != 10.5 || intervals[0].End != 11.2 {
 		t.Errorf("interval 0: got start=%f end=%f, want start=10.5 end=11.2",
-			intervals[0].start, intervals[0].end)
+			intervals[0].Start, intervals[0].End)
 	}
 
 	// Check second interval
-	if intervals[1].start != 45.0 || intervals[1].end != 46.5 {
+	if intervals[1].Start != 45.0 || intervals[1].End != 46.5 {
 		t.Errorf("interval 1: got start=%f end=%f, want start=45.0 end=46.5",
-			intervals[1].start, intervals[1].end)
+			intervals[1].Start, intervals[1].End)
 	}
 }
 
