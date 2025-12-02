@@ -245,7 +245,7 @@ func TestProcessVideoService_GetJob_NotFound(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := svc.GetJob(ctx, "nonexistent")
-	if err != ErrJobNotFound {
+	if !errors.Is(err, ErrJobNotFound) {
 		t.Errorf("expected ErrJobNotFound, got %v", err)
 	}
 }

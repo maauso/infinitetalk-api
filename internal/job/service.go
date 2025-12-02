@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -17,6 +18,16 @@ import (
 	"github.com/maauso/infinitetalk-api/internal/media"
 	"github.com/maauso/infinitetalk-api/internal/runpod"
 	"github.com/maauso/infinitetalk-api/internal/storage"
+)
+
+// Static errors for job service operations.
+var (
+	// ErrRunPodJobFailed is returned when a RunPod job fails.
+	ErrRunPodJobFailed = errors.New("RunPod job failed")
+	// ErrRunPodJobCancelled is returned when a RunPod job is cancelled.
+	ErrRunPodJobCancelled = errors.New("RunPod job cancelled")
+	// ErrRunPodJobTimedOut is returned when a RunPod job times out.
+	ErrRunPodJobTimedOut = errors.New("RunPod job timed out")
 )
 
 // ProcessVideoInput contains the input parameters for video processing.
@@ -155,7 +166,7 @@ func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoI
 			slog.String("job_id", job.ID),
 			slog.String("error", err.Error()),
 		)
-		return nil, err
+		return nil, fmt.Errorf("save job: %w", err)
 	}
 
 	return job, nil
@@ -163,7 +174,11 @@ func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoI
 
 // GetJob retrieves a job by ID.
 func (s *ProcessVideoService) GetJob(ctx context.Context, id string) (*Job, error) {
-	return s.repo.FindByID(ctx, id)
+	job, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("find job: %w", err)
+	}
+	return job, nil
 }
 
 // Process executes the complete video processing workflow.
@@ -186,8 +201,9 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 
 	// Track temporary files for cleanup
 	var tempFiles []string
-	defer func() {
+	defer func() { //nolint:contextcheck // Using context.Background() intentionally for cleanup
 		if len(tempFiles) > 0 {
+			// Cleanup should happen even after the original context is cancelled
 			if cleanupErr := s.storage.CleanupTemp(context.Background(), tempFiles); cleanupErr != nil {
 				s.logger.Warn("failed to cleanup temp files",
 					slog.String("job_id", job.ID),
@@ -206,7 +222,7 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 		return s.failJob(ctx, job, fmt.Sprintf("failed to start job: %v", err))
 	}
 	if err := s.repo.Save(ctx, job); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("save job: %w", err)
 	}
 
 	s.logger.Info("job started, processing video",
@@ -299,7 +315,7 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 	}
 	job.SetChunks(chunks)
 	if err := s.repo.Save(ctx, job); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("save job: %w", err)
 	}
 
 	// Step 5: Process chunks in parallel with semaphore
@@ -336,7 +352,7 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 	// Step 7: Optional S3 upload
 	var videoURL string
 	if input.PushToS3 {
-		videoFile, err := os.Open(outputVideoPath)
+		videoFile, err := os.Open(outputVideoPath) // #nosec G304 - outputVideoPath is constructed internally
 		if err != nil {
 			s.logger.Error("failed to open output video for S3 upload",
 				slog.String("job_id", job.ID),
@@ -344,7 +360,7 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 			)
 			return s.failJob(ctx, job, fmt.Sprintf("failed to open output video: %v", err))
 		}
-		defer videoFile.Close()
+		defer func() { _ = videoFile.Close() }()
 
 		s3Key := fmt.Sprintf("videos/%s.mp4", job.ID)
 		videoURL, err = s.storage.UploadToS3(ctx, s3Key, videoFile)
@@ -373,10 +389,10 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 			slog.String("job_id", job.ID),
 			slog.String("error", err.Error()),
 		)
-		return nil, err
+		return nil, fmt.Errorf("complete job: %w", err)
 	}
 	if err := s.repo.Save(ctx, job); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("save job: %w", err)
 	}
 
 	s.logger.Info("job completed successfully",
@@ -412,7 +428,7 @@ func (s *ProcessVideoService) processChunksParallel(
 	for i, chunkPath := range audioChunks {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
 		default:
 		}
 
@@ -587,7 +603,7 @@ func (s *ProcessVideoService) pollForResult(ctx context.Context, jobID string, c
 	for {
 		select {
 		case <-ctx.Done():
-			return "", ctx.Err()
+			return "", fmt.Errorf("context cancelled: %w", ctx.Err())
 		case <-ticker.C:
 			result, err := s.runpod.Poll(ctx, runpodJobID)
 			if err != nil {
@@ -610,11 +626,11 @@ func (s *ProcessVideoService) pollForResult(ctx context.Context, jobID string, c
 			case runpod.StatusCompleted:
 				return result.VideoBase64, nil
 			case runpod.StatusFailed:
-				return "", fmt.Errorf("RunPod job failed: %s", result.Error)
+				return "", fmt.Errorf("%w: %s", ErrRunPodJobFailed, result.Error)
 			case runpod.StatusCancelled:
-				return "", fmt.Errorf("RunPod job cancelled")
+				return "", ErrRunPodJobCancelled
 			case runpod.StatusTimedOut:
-				return "", fmt.Errorf("RunPod job timed out")
+				return "", ErrRunPodJobTimedOut
 			case runpod.StatusInQueue, runpod.StatusRunning:
 				// Continue polling
 			default:
@@ -634,9 +650,10 @@ func (s *ProcessVideoService) updateChunkStatus(job *Job, idx int, status ChunkS
 	if idx >= 0 && idx < len(job.Chunks) {
 		job.Chunks[idx].Status = status
 		job.Chunks[idx].Error = errMsg
-		if status == ChunkStatusProcessing {
+		switch status {
+		case ChunkStatusProcessing:
 			job.Chunks[idx].StartedAt = time.Now()
-		} else if status == ChunkStatusCompleted || status == ChunkStatusFailed {
+		case ChunkStatusCompleted, ChunkStatusFailed:
 			job.Chunks[idx].CompletedAt = time.Now()
 		}
 	}
@@ -659,7 +676,7 @@ func (s *ProcessVideoService) saveBase64ToTemp(ctx context.Context, b64Data, fil
 
 // fileToBase64 reads a file and returns its base64-encoded content.
 func (s *ProcessVideoService) fileToBase64(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 - path is constructed internally
 	if err != nil {
 		return "", fmt.Errorf("read file: %w", err)
 	}
@@ -667,7 +684,8 @@ func (s *ProcessVideoService) fileToBase64(path string) (string, error) {
 }
 
 // failJob marks the job as failed and returns the appropriate output.
-func (s *ProcessVideoService) failJob(ctx context.Context, job *Job, errMsg string) (*ProcessVideoOutput, error) {
+// The second return value is always nil, as we want to return a valid output with error info.
+func (s *ProcessVideoService) failJob(ctx context.Context, job *Job, errMsg string) (*ProcessVideoOutput, error) { //nolint:unparam
 	if err := job.Fail(errMsg); err != nil {
 		s.logger.Error("failed to transition job to failed state",
 			slog.String("job_id", job.ID),
