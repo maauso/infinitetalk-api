@@ -54,6 +54,13 @@ type HTTPClient struct {
 // ClientOption is a function that configures an HTTPClient.
 type ClientOption func(*HTTPClient)
 
+// WithAPIKey sets the API key for authentication.
+func WithAPIKey(key string) ClientOption {
+	return func(hc *HTTPClient) {
+		hc.apiKey = key
+	}
+}
+
 // WithHTTPClient sets a custom HTTP client.
 func WithHTTPClient(c *http.Client) ClientOption {
 	return func(hc *HTTPClient) {
@@ -83,20 +90,15 @@ func WithBaseBackoff(d time.Duration) ClientOption {
 }
 
 // NewClient creates a new RunPod HTTP client.
-// The API key is read from the environment variable RUNPOD_API_KEY if not provided.
+// The API key can be set via the WithAPIKey option. If not provided,
+// it is read from the environment variable RUNPOD_API_KEY.
 // The endpoint ID must be provided.
 func NewClient(endpointID string, opts ...ClientOption) (*HTTPClient, error) {
 	if endpointID == "" {
 		return nil, ErrEndpointIDRequired
 	}
 
-	apiKey := os.Getenv("RUNPOD_API_KEY")
-	if apiKey == "" {
-		return nil, ErrAPIKeyNotSet
-	}
-
 	c := &HTTPClient{
-		apiKey:      apiKey,
 		endpointID:  endpointID,
 		baseURL:     "https://api.runpod.ai/v2",
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
@@ -104,8 +106,18 @@ func NewClient(endpointID string, opts ...ClientOption) (*HTTPClient, error) {
 		baseBackoff: 1 * time.Second,
 	}
 
+	// Apply options first to allow WithAPIKey to set the API key
 	for _, opt := range opts {
 		opt(c)
+	}
+
+	// If API key was not set via option, try environment variable
+	if c.apiKey == "" {
+		c.apiKey = os.Getenv("RUNPOD_API_KEY")
+	}
+
+	if c.apiKey == "" {
+		return nil, ErrAPIKeyNotSet
 	}
 
 	return c, nil
