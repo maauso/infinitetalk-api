@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    environment:
+      - PORT=${PORT:-8080}
+      - RUNPOD_API_KEY=${RUNPOD_API_KEY}
+      - RUNPOD_ENDPOINT_ID=${RUNPOD_ENDPOINT_ID}
+      - TEMP_DIR=${TEMP_DIR:-/tmp/infinitetalk}
+      - MAX_CONCURRENT_CHUNKS=${MAX_CONCURRENT_CHUNKS:-3}
+      - CHUNK_TARGET_SEC=${CHUNK_TARGET_SEC:-45}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Optional S3 configuration
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_REGION=${S3_REGION:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+    volumes:
+      - temp-data:/tmp/infinitetalk
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:${PORT:-8080}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  temp-data:
