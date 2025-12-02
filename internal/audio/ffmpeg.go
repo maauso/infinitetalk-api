@@ -126,7 +126,7 @@ func (s *FFmpegSplitter) getAudioDuration(ctx context.Context, inputPath string)
 func (s *FFmpegSplitter) detectSilences(ctx context.Context, inputPath string, opts SplitOpts) ([]SilenceInterval, error) {
 	// Build silencedetect filter
 	filter := fmt.Sprintf("silencedetect=noise=%ddB:d=%f",
-		int(opts.SilenceThreshDb),
+		int(opts.SilenceThreshDB),
 		float64(opts.MinSilenceMs)/1000.0,
 	)
 
