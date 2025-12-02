@@ -2,12 +2,14 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
 	"strings"
+
+	"github.com/sethvargo/go-envconfig"
 )
 
 // Static errors for configuration validation.
@@ -21,28 +23,28 @@ var (
 // Config holds all configuration for the application.
 type Config struct {
 	// Server settings
-	Port int `json:"port"`
+	Port int `env:"PORT, default=8080" json:"port"`
 
 	// RunPod settings
-	RunPodAPIKey     string `json:"-"` // Masked in JSON
-	RunPodEndpointID string `json:"runpod_endpoint_id"`
+	RunPodAPIKey     string `env:"RUNPOD_API_KEY, required" json:"-"` // Masked in JSON
+	RunPodEndpointID string `env:"RUNPOD_ENDPOINT_ID, required" json:"runpod_endpoint_id"`
 
 	// Storage settings
-	TempDir string `json:"temp_dir"`
+	TempDir string `env:"TEMP_DIR, default=/tmp/infinitetalk" json:"temp_dir"`
 
 	// Processing settings
-	MaxConcurrentChunks int `json:"max_concurrent_chunks"`
-	ChunkTargetSec      int `json:"chunk_target_sec"`
+	MaxConcurrentChunks int `env:"MAX_CONCURRENT_CHUNKS, default=3" json:"max_concurrent_chunks"`
+	ChunkTargetSec      int `env:"CHUNK_TARGET_SEC, default=45" json:"chunk_target_sec"`
 
 	// Optional S3 settings
-	S3Bucket          string `json:"s3_bucket,omitempty"`
-	S3Region          string `json:"s3_region,omitempty"`
-	AWSAccessKeyID    string `json:"-"` // Masked in JSON
-	AWSSecretAccessKey string `json:"-"` // Masked in JSON
+	S3Bucket           string `env:"S3_BUCKET" json:"s3_bucket,omitempty"`
+	S3Region           string `env:"S3_REGION" json:"s3_region,omitempty"`
+	AWSAccessKeyID     string `env:"AWS_ACCESS_KEY_ID" json:"-"`     // Masked in JSON
+	AWSSecretAccessKey string `env:"AWS_SECRET_ACCESS_KEY" json:"-"` // Masked in JSON
 
 	// Logging settings
-	LogFormat string `json:"log_format"` // "json" or "text"
-	LogLevel  string `json:"log_level"`  // "debug", "info", "warn", "error"
+	LogFormat string `env:"LOG_FORMAT, default=text" json:"log_format"` // "json" or "text"
+	LogLevel  string `env:"LOG_LEVEL, default=info" json:"log_level"`   // "debug", "info", "warn", "error"
 }
 
 // S3Enabled returns true if S3 configuration is provided.
@@ -50,31 +52,20 @@ func (c *Config) S3Enabled() bool {
 	return c.S3Bucket != "" && c.S3Region != ""
 }
 
-// Load reads configuration from environment variables.
+// Load reads configuration from environment variables using go-envconfig.
 // It returns an error if required variables are not set.
 func Load() (*Config, error) {
-	cfg := &Config{
-		// Defaults
-		Port:                getEnvInt("PORT", 8080),
-		TempDir:             getEnv("TEMP_DIR", "/tmp/infinitetalk"),
-		MaxConcurrentChunks: getEnvInt("MAX_CONCURRENT_CHUNKS", 3),
-		ChunkTargetSec:      getEnvInt("CHUNK_TARGET_SEC", 45),
-		LogFormat:           getEnv("LOG_FORMAT", "text"),
-		LogLevel:            getEnv("LOG_LEVEL", "info"),
+	cfg := &Config{}
 
-		// Required
-		RunPodAPIKey:     os.Getenv("RUNPOD_API_KEY"),
-		RunPodEndpointID: os.Getenv("RUNPOD_ENDPOINT_ID"),
-
-		// Optional S3
-		S3Bucket:          os.Getenv("S3_BUCKET"),
-		S3Region:          os.Getenv("S3_REGION"),
-		AWSAccessKeyID:    os.Getenv("AWS_ACCESS_KEY_ID"),
-		AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
-	}
-
-	if err := cfg.Validate(); err != nil {
-		return nil, err
+	if err := envconfig.Process(context.Background(), cfg); err != nil {
+		// Map envconfig errors to our domain errors for required fields
+		if strings.Contains(err.Error(), "RUNPOD_API_KEY") {
+			return nil, ErrRunPodAPIKeyRequired
+		}
+		if strings.Contains(err.Error(), "RUNPOD_ENDPOINT_ID") {
+			return nil, ErrRunPodEndpointIDRequired
+		}
+		return nil, fmt.Errorf("config: %w", err)
 	}
 
 	return cfg, nil
@@ -125,24 +116,6 @@ func (c *Config) String() string {
 		c.LogFormat,
 		c.LogLevel,
 	)
-}
-
-// getEnv returns the value of the environment variable or a default value.
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-// getEnvInt returns the value of the environment variable as an integer or a default value.
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if i, err := strconv.Atoi(value); err == nil {
-			return i
-		}
-	}
-	return defaultValue
 }
 
 // parseLogLevel converts a string log level to slog.Level.

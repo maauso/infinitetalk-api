@@ -107,12 +107,9 @@ func TestLoad_InvalidIntegerDefaults(t *testing.T) {
 	t.Setenv("PORT", "not-a-number")
 	t.Setenv("MAX_CONCURRENT_CHUNKS", "invalid")
 
-	cfg, err := Load()
-	require.NoError(t, err)
-
-	// Should use defaults when parsing fails
-	assert.Equal(t, 8080, cfg.Port)
-	assert.Equal(t, 3, cfg.MaxConcurrentChunks)
+	// go-envconfig returns an error when parsing fails
+	_, err := Load()
+	require.Error(t, err)
 }
 
 func TestConfig_S3Enabled(t *testing.T) {
