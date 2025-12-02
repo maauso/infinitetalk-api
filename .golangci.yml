@@ -3,26 +3,16 @@ version: "2"
 run:
   # Timeout for analysis
   timeout: 5m
-
-
   allow-parallel-runners: true
-
   concurrency: 4
   # Exclude test files from linting
   tests: false
-
   # Use Go version from go.mod
   go: '1.25'
 
-  # Which dirs to skip: they won't be analyzed
-  skip-dirs:
-    - vendor
-    - tmp
-    - temp
-
 linters:
   # Disable all linters by default to enable only what we need
-  disable-all: true
+  default: none
   # Enable specific linters recommended for REST API projects
   enable:
     # Enabled by default - critical linters
@@ -85,129 +75,123 @@ linters:
     - testifylint       # Check usage of github.com/stretchr/testify
     - thelper           # Detect golang test helpers without t.Helper()
 
-linters-settings:
-  errcheck:
-    # Report about not checking of errors in type assertions
-    check-type-assertions: true
-    # Report about assignment of errors to blank identifier
-    check-blank: true
+  settings:
+    errcheck:
+      # Report about not checking of errors in type assertions
+      check-type-assertions: true
+      # Report about assignment of errors to blank identifier
+      check-blank: true
 
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment  # Too strict for this project
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment  # Too strict for this project
 
-  gocyclo:
-    # Minimal cyclomatic complexity to report
-    min-complexity: 15
+    gocyclo:
+      # Minimal cyclomatic complexity to report
+      min-complexity: 15
 
-  gocognit:
-    # Minimal cognitive complexity to report
-    min-complexity: 20
+    gocognit:
+      # Minimal cognitive complexity to report
+      min-complexity: 20
 
-  dupl:
-    # Tokens count to trigger issue
-    threshold: 150
+    dupl:
+      # Tokens count to trigger issue
+      threshold: 150
 
-  goconst:
-    # Minimal length of string constant
-    min-len: 3
-    # Minimum occurrences to report
-    min-occurrences: 3
+    goconst:
+      # Minimal length of string constant
+      min-len: 3
+      # Minimum occurrences to report
+      min-occurrences: 3
 
-  misspell:
-    locale: US
+    misspell:
+      locale: US
 
-  nakedret:
-    # Make an issue if function has more lines of code than this
-    max-func-lines: 30
+    nakedret:
+      # Make an issue if function has more lines of code than this
+      max-func-lines: 30
 
-  revive:
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - "checkPrivateReceivers"
+            - "disableStutteringCheck"
+        - name: package-comments
+        - name: indent-error-flow
+        - name: error-return
+        - name: error-naming
+        - name: if-return
+        - name: var-naming
+        - name: context-as-argument
+        - name: context-keys-type
+
+    gosec:
+      excludes:
+        - G404  # Use of weak random number generator (math/rand) - fine for non-crypto use
+
+    staticcheck:
+      checks: ["all"]
+
+    sloglint:
+      # Enforce not using global loggers
+      no-global: "all"
+      # Enforce using methods that accept a context
+      context: "all"
+
+  exclusions:
+    # Exclude rules for test files
     rules:
-      - name: exported
-        arguments:
-          - "checkPrivateReceivers"
-          - "disableStutteringCheck"
-      - name: package-comments
-      - name: indent-error-flow
-      - name: error-return
-      - name: error-naming
-      - name: if-return
-      - name: var-naming
-      - name: context-as-argument
-      - name: context-keys-type
+      # Exclude some linters from running on test files
+      - path: _test\.go
+        linters:
+          - dupl           # Test cases often have similar structure
+          - errcheck       # Tests often intentionally ignore errors
+          - funlen         # Test functions can be long
+          - gocognit       # Test complexity is less critical
+          - gocyclo        # Test complexity is less critical
+          - gosec          # Security is less critical in tests
+          - wrapcheck      # Error wrapping less critical in tests
+          - err113         # Dynamic errors are fine in tests
+          - contextcheck   # Context handling less strict in tests
 
-  gosec:
-    excludes:
-      - G404  # Use of weak random number generator (math/rand) - fine for non-crypto use
+      # Exclude mocks from various checks
+      - path: mocks_test\.go
+        linters:
+          - revive
+          - stylecheck
+          - unused
 
-  staticcheck:
-    checks: ["all"]
+      # Allow dot imports in tests (for gomega/ginkgo style if used)
+      - path: ".*\\/mocks\\/.*"
+        linters:
+          - all
 
-  gci:
-    sections:
-      - standard  # Standard packages
-      - default   # All other packages
-      - prefix(github.com/maauso/infinitetalk-api)  # Project packages
+      # Exclude known false positives
+      - linters:
+          - staticcheck
+        text: "SA1019:"  # Deprecated function usage
 
-  sloglint:
-    # Enforce not using global loggers
-    no-global: "all"
-    # Enforce using methods that accept a context
-    context: "all"
+      # Exclude some revive rules for generated code
+      - path: ".*\\.pb\\.go$"
+        linters:
+          - revive
+          - stylecheck
+
+    # Paths to exclude from analysis
+    paths:
+      - vendor
+      - tmp
+      - temp
+      - ".*\\.pb\\.go$"       # Protocol buffer generated files
+      - ".*\\.gen\\.go$"      # Other generated files
 
 issues:
   # Maximum issues count per linter
   max-issues-per-linter: 0
-
   # Maximum count of issues with the same text
   max-same-issues: 0
-
-  # List of regexps of issue texts to exclude
-  exclude-use-default: false
-
-  # Exclude rules for test files
-  exclude-rules:
-    # Exclude some linters from running on test files
-    - path: _test\.go
-      linters:
-        - dupl           # Test cases often have similar structure
-        - errcheck       # Tests often intentionally ignore errors
-        - funlen         # Test functions can be long
-        - gocognit       # Test complexity is less critical
-        - gocyclo        # Test complexity is less critical
-        - gosec          # Security is less critical in tests
-        - wrapcheck      # Error wrapping less critical in tests
-        - err113         # Dynamic errors are fine in tests
-        - contextcheck   # Context handling less strict in tests
-
-    # Exclude mocks from various checks
-    - path: mocks_test\.go
-      linters:
-        - revive
-        - stylecheck
-        - unused
-
-    # Allow dot imports in tests (for gomega/ginkgo style if used)
-    - path: ".*\\/mocks\\/.*"
-      linters:
-      - "*"
-
-    # Exclude known false positives
-    - linters:
-        - staticcheck
-      text: "SA1019:"  # Deprecated function usage
-
-    # Exclude some revive rules for generated code
-    - path: ".*\\.pb\\.go$"
-      linters:
-        - revive
-        - stylecheck
-
-  # Exclude specific files from analysis
-  exclude-files:
-    - ".*\\.pb\\.go$"       # Protocol buffer generated files
-    - ".*\\.gen\\.go$"      # Other generated files
 
 output:
   formats:
