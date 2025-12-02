@@ -23,7 +23,7 @@ Migrate the functionalities of `libsync.py` to a REST API in Go following:
 | **Phase 5** | Use Case `ProcessVideo` | ✅ Completed |
 | **Phase 6** | HTTP Server | ✅ Completed |
 | **Phase 7** | `internal/storage` - Storage | ✅ Completed |
-| **Phase 8** | Configuration and Observability | ⏳ Not started |
+| **Phase 8** | Configuration and Observability | ✅ Completed |
 | **Phase 9** | Integration and E2E | ⏳ Not started |
 
 ---
@@ -390,7 +390,9 @@ type Storage interface {
 
 ---
 
-## Phase 8 — Configuration and Observability
+## Phase 8 — Configuration and Observability ✅ COMPLETED
+
+> **Status**: Completed (2025-12-02)
 
 **Description**
 
@@ -398,6 +400,12 @@ type Storage interface {
 - Structured logging: `slog` (stdlib Go 1.21+).
 - Prometheus metrics (optional): `/metrics`, job counter, duration.
 - OpenTelemetry tracing (optional).
+
+**Files**:
+- ✅ `internal/config/config.go` - Configuration loading from environment
+- ✅ `internal/config/config_test.go` - Unit tests
+- ✅ `main.go` - Wired up all dependencies with config
+- ✅ `docker-compose.yml` - Docker Compose configuration
 
 **Environment variables**:
 ```
@@ -407,6 +415,8 @@ RUNPOD_ENDPOINT_ID=xxx
 TEMP_DIR=/tmp/infinitetalk
 MAX_CONCURRENT_CHUNKS=3
 CHUNK_TARGET_SEC=45
+LOG_FORMAT=json       # "json" for production, "text" for development
+LOG_LEVEL=info        # "debug", "info", "warn", "error"
 # Optional S3
 S3_BUCKET=
 S3_REGION=
@@ -416,9 +426,9 @@ AWS_SECRET_ACCESS_KEY=
 
 **Acceptance Criteria**
 
-1. All sensitive variables (API keys) come from env, not hardcoded.
-2. JSON logs in production (`LOG_FORMAT=json`).
-3. `docker-compose.yml` starts service + Prometheus (optional).
+1. ✅ All sensitive variables (API keys) come from env, not hardcoded.
+2. ✅ JSON logs in production (`LOG_FORMAT=json`).
+3. ✅ `docker-compose.yml` starts service.
 
 ---
 

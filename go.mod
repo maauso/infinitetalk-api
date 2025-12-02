@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.2
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.92.1
 	github.com/go-playground/validator/v10 v10.28.0
+	github.com/sethvargo/go-envconfig v1.1.0
 	github.com/stretchr/testify v1.11.1
 )
 

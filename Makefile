@@ -12,12 +12,15 @@ MOCKERY_CMD := $(if $(MOCKERY_BIN),$(MOCKERY_BIN),docker run --rm -v "$(PWD)":/s
 
 .PHONY: build test lint linters lint-fix mocks tidy fmt
 
+# Build the application binary
 build:
-	$(GO) build $(PKG)
+	$(GO) build -o infinitetalk-api .
 
+# Run tests with race detection
 test:
 	$(GO) test -race -count=1 $(PKG)
 
+# Run linter
 lint:
 	$(GOLANGCI_CMD)
 
@@ -35,16 +38,3 @@ tidy:
 
 fmt:
 	$(GO) fmt $(PKG)
-.PHONY: build test lint
-
-# Build the application binary
-build:
-	go build -o infinitetalk-api .
-
-# Run tests with race detection
-test:
-	go test -race ./...
-
-# Run linter
-lint:
-	golangci-lint run ./...
