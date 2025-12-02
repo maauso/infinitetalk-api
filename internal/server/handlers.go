@@ -96,7 +96,7 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Start processing in background with a detached context
-	// Use background context to prevent cancellation when the request ends
+	// Use context.WithoutCancel to prevent cancellation when the request ends
 	if h.enableAsyncProcess {
 		go func(ctx context.Context, jobID string, inp job.ProcessVideoInput) {
 			_, processErr := h.service.ProcessExistingJob(ctx, jobID, inp)
@@ -106,7 +106,7 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 					slog.String("error", processErr.Error()),
 				)
 			}
-		}(context.Background(), createdJob.ID, input)
+		}(context.WithoutCancel(r.Context()), createdJob.ID, input)
 	}
 
 	h.logger.Info("job created",
