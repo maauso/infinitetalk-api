@@ -4,11 +4,32 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"time"
+)
+
+// Static errors for RunPod client operations.
+var (
+	// ErrEndpointIDRequired is returned when the endpoint ID is not provided.
+	ErrEndpointIDRequired = errors.New("runpod: endpoint ID is required")
+	// ErrAPIKeyNotSet is returned when the RUNPOD_API_KEY environment variable is not set.
+	ErrAPIKeyNotSet = errors.New("runpod: RUNPOD_API_KEY environment variable is not set")
+	// ErrJobIDRequired is returned when the job ID is not provided.
+	ErrJobIDRequired = errors.New("runpod: job ID is required")
+	// ErrNoJobIDReturned is returned when the submit response contains no job ID.
+	ErrNoJobIDReturned = errors.New("runpod: submit failed: no job ID returned")
+	// ErrSubmitFailed is returned when the submit operation fails.
+	ErrSubmitFailed = errors.New("runpod: submit failed")
+	// ErrServerError is returned when the server returns a 5xx status code.
+	ErrServerError = errors.New("runpod: server error")
+	// ErrRateLimited is returned when the server returns a 429 status code.
+	ErrRateLimited = errors.New("runpod: rate limited")
+	// ErrRequestFailed is returned when the request fails with a non-2xx status code.
+	ErrRequestFailed = errors.New("runpod: request failed")
 )
 
 // Client defines the interface for interacting with the RunPod API.
@@ -66,12 +87,12 @@ func WithBaseBackoff(d time.Duration) ClientOption {
 // The endpoint ID must be provided.
 func NewClient(endpointID string, opts ...ClientOption) (*HTTPClient, error) {
 	if endpointID == "" {
-		return nil, fmt.Errorf("runpod: endpoint ID is required")
+		return nil, ErrEndpointIDRequired
 	}
 
 	apiKey := os.Getenv("RUNPOD_API_KEY")
 	if apiKey == "" {
-		return nil, fmt.Errorf("runpod: RUNPOD_API_KEY environment variable is not set")
+		return nil, ErrAPIKeyNotSet
 	}
 
 	c := &HTTPClient{
@@ -131,9 +152,9 @@ func (c *HTTPClient) Submit(ctx context.Context, imageB64, audioB64 string, opts
 
 	if resp.ID == "" {
 		if resp.Error != "" {
-			return "", fmt.Errorf("runpod: submit failed: %s", resp.Error)
+			return "", fmt.Errorf("%w: %s", ErrSubmitFailed, resp.Error)
 		}
-		return "", fmt.Errorf("runpod: submit failed: no job ID returned")
+		return "", ErrNoJobIDReturned
 	}
 
 	return resp.ID, nil
@@ -142,7 +163,7 @@ func (c *HTTPClient) Submit(ctx context.Context, imageB64, audioB64 string, opts
 // Poll checks the status of a job and returns the result.
 func (c *HTTPClient) Poll(ctx context.Context, jobID string) (PollResult, error) {
 	if jobID == "" {
-		return PollResult{}, fmt.Errorf("runpod: job ID is required")
+		return PollResult{}, ErrJobIDRequired
 	}
 
 	url := fmt.Sprintf("%s/%s/status/%s", c.baseURL, c.endpointID, jobID)
@@ -227,14 +248,14 @@ func (c *HTTPClient) doRequest(ctx context.Context, method, url string, body []b
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		// 5xx errors are retryable
 		if resp.StatusCode >= 500 {
-			return &retryableError{err: fmt.Errorf("runpod: server error %d: %s", resp.StatusCode, string(respBody))}
+			return &retryableError{err: fmt.Errorf("%w %d: %s", ErrServerError, resp.StatusCode, string(respBody))}
 		}
 		// 429 (rate limit) is retryable
 		if resp.StatusCode == 429 {
-			return &retryableError{err: fmt.Errorf("runpod: rate limited: %s", string(respBody))}
+			return &retryableError{err: fmt.Errorf("%w: %s", ErrRateLimited, string(respBody))}
 		}
 		// Other errors are not retryable
-		return fmt.Errorf("runpod: request failed with status %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("%w with status %d: %s", ErrRequestFailed, resp.StatusCode, string(respBody))
 	}
 
 	if result != nil {
@@ -261,6 +282,6 @@ func (e *retryableError) Unwrap() error {
 
 // isRetryable returns true if the error should be retried.
 func isRetryable(err error) bool {
-	_, ok := err.(*retryableError)
-	return ok
+	var re *retryableError
+	return errors.As(err, &re)
 }

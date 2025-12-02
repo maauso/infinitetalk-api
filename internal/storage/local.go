@@ -46,7 +46,7 @@ func (s *LocalStorage) TempDir() string {
 func (s *LocalStorage) SaveTemp(ctx context.Context, name string, data io.Reader) (string, error) {
 	select {
 	case <-ctx.Done():
-		return "", ctx.Err()
+		return "", fmt.Errorf("context cancelled: %w", ctx.Err())
 	default:
 	}
 
@@ -75,11 +75,11 @@ func (s *LocalStorage) SaveTemp(ctx context.Context, name string, data io.Reader
 func (s *LocalStorage) LoadTemp(ctx context.Context, path string) (io.ReadCloser, error) {
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
 	default:
 	}
 
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 - path is provided by trusted caller
 	if err != nil {
 		return nil, fmt.Errorf("open temp file: %w", err)
 	}
@@ -95,7 +95,7 @@ func (s *LocalStorage) CleanupTemp(ctx context.Context, paths []string) error {
 	for _, p := range paths {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("context cancelled: %w", ctx.Err())
 		default:
 		}
 

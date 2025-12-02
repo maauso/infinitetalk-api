@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -78,7 +79,7 @@ func TestLocalStorage_SaveTemp(t *testing.T) {
 		cancel()
 
 		_, err := storage.SaveTemp(ctx, "test", bytes.NewReader([]byte("data")))
-		if err != context.Canceled {
+		if !errors.Is(err, context.Canceled) {
 			t.Errorf("expected context.Canceled, got %v", err)
 		}
 	})
@@ -122,7 +123,7 @@ func TestLocalStorage_LoadTemp(t *testing.T) {
 		cancel()
 
 		_, err := storage.LoadTemp(ctx, "/some/path")
-		if err != context.Canceled {
+		if !errors.Is(err, context.Canceled) {
 			t.Errorf("expected context.Canceled, got %v", err)
 		}
 	})
@@ -166,7 +167,7 @@ func TestLocalStorage_CleanupTemp(t *testing.T) {
 		cancel()
 
 		err := storage.CleanupTemp(ctx, []string{"/some/path"})
-		if err != context.Canceled {
+		if !errors.Is(err, context.Canceled) {
 			t.Errorf("expected context.Canceled, got %v", err)
 		}
 	})
