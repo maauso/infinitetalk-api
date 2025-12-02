@@ -79,7 +79,7 @@ func run() error {
 	}
 
 	// Initialize RunPod client
-	runpodClient, err := runpod.NewClient(cfg.RunPodEndpointID)
+	runpodClient, err := runpod.NewClient(cfg.RunPodEndpointID, runpod.WithAPIKey(cfg.RunPodAPIKey))
 	if err != nil {
 		return fmt.Errorf("create RunPod client: %w", err)
 	}

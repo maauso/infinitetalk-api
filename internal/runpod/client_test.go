@@ -96,6 +96,35 @@ func TestNewClient_Success(t *testing.T) {
 	}
 }
 
+func TestNewClient_WithAPIKeyOption(t *testing.T) {
+	// Ensure environment API key is NOT set
+	_ = os.Unsetenv("RUNPOD_API_KEY")
+
+	client, err := NewClient("test-endpoint", WithAPIKey("explicit-api-key"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected non-nil client")
+	}
+	if client.apiKey != "explicit-api-key" {
+		t.Errorf("expected apiKey to be 'explicit-api-key', got '%s'", client.apiKey)
+	}
+}
+
+func TestNewClient_WithAPIKeyOptionOverridesEnv(t *testing.T) {
+	setTestEnv(t) // Sets RUNPOD_API_KEY=test-key
+
+	client, err := NewClient("test-endpoint", WithAPIKey("explicit-api-key"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// WithAPIKey should be used instead of env
+	if client.apiKey != "explicit-api-key" {
+		t.Errorf("expected apiKey to be 'explicit-api-key', got '%s'", client.apiKey)
+	}
+}
+
 func TestSubmit_Success(t *testing.T) {
 	setTestEnv(t)
 
