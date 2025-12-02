@@ -21,7 +21,7 @@ Migrate the functionalities of `libsync.py` to a REST API in Go following:
 | **Phase 3** | `internal/job` - Job Aggregate | ✅ Completed |
 | **Phase 4** | `internal/runpod` - RunPod Client | ✅ Completed |
 | **Phase 5** | Use Case `ProcessVideo` | ✅ Completed |
-| **Phase 6** | HTTP Server | ⏳ Not started |
+| **Phase 6** | HTTP Server | ✅ Completed |
 | **Phase 7** | `internal/storage` - Storage | ✅ Completed |
 | **Phase 8** | Configuration and Observability | ⏳ Not started |
 | **Phase 9** | Integration and E2E | ⏳ Not started |
@@ -290,7 +290,9 @@ Complete `ProcessVideoService` in `internal/job/service.go` that orchestrates:
 
 ---
 
-## Phase 6 — HTTP Server (`internal/server`)
+## Phase 6 — HTTP Server (`internal/server`) ✅ COMPLETED
+
+> **Status**: Completed (2025-12-01)
 
 **Description**
 REST handlers using **`net/http` stdlib** (Go 1.22+ `ServeMux`):
@@ -303,10 +305,12 @@ mux.HandleFunc("GET /health", h.Health)
 ```
 
 **Files**:
-- `internal/server/handlers.go` - HTTP Handlers
-- `internal/server/middleware.go` - Middlewares (logging, recovery, CORS)
-- `internal/server/routes.go` - Route configuration
-- `internal/server/types.go` - HTTP DTOs (separated from domain)
+- ✅ `internal/server/handlers.go` - HTTP Handlers
+- ✅ `internal/server/middleware.go` - Middlewares (logging, recovery, CORS)
+- ✅ `internal/server/routes.go` - Route configuration
+- ✅ `internal/server/types.go` - HTTP DTOs (separated from domain)
+- ✅ `internal/server/handlers_test.go` - Integration tests with httptest + mocks
+- ✅ `api/openapi.yaml` - OpenAPI 3.0 specification
 
 - `POST /jobs`: receives `image_base64`, `audio_base64` or multipart, `width`, `height`, `push_to_s3` (optional bool).
 - `GET /jobs/{id}`: status, progress, final video (inline or S3 URL if `push_to_s3` was true).
@@ -338,11 +342,11 @@ mux.HandleFunc("GET /health", h.Health)
 
 **Acceptance Criteria**
 
-1. OpenAPI spec documented (manual or generated).
-2. Errors return structured JSON (`{"error": "...", "code": "..."}`).
-3. Integration tests with `httptest` + use case mocks.
-4. Health endpoint `GET /health`.
-5. Video returned in response body (streaming) or S3 URL according to flag.
+1. ✅ OpenAPI spec documented (manual or generated).
+2. ✅ Errors return structured JSON (`{"error": "...", "code": "..."}`).
+3. ✅ Integration tests with `httptest` + use case mocks.
+4. ✅ Health endpoint `GET /health`.
+5. ✅ Video returned in response body (streaming) or S3 URL according to flag.
 
 ---
 

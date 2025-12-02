@@ -181,6 +181,18 @@ func (s *ProcessVideoService) GetJob(ctx context.Context, id string) (*Job, erro
 	return job, nil
 }
 
+// ProcessExistingJob executes the video processing workflow for an existing job.
+// This is used when the job has already been created and needs to be processed.
+func (s *ProcessVideoService) ProcessExistingJob(ctx context.Context, jobID string, input ProcessVideoInput) (*ProcessVideoOutput, error) {
+	// Retrieve the existing job
+	job, err := s.repo.FindByID(ctx, jobID)
+	if err != nil {
+		return nil, fmt.Errorf("find job: %w", err)
+	}
+
+	return s.processJob(ctx, job, input)
+}
+
 // Process executes the complete video processing workflow.
 //
 // The workflow:
@@ -199,6 +211,11 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 		return nil, err
 	}
 
+	return s.processJob(ctx, job, input)
+}
+
+// processJob executes the video processing workflow for the given job.
+func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input ProcessVideoInput) (*ProcessVideoOutput, error) {
 	// Track temporary files for cleanup
 	var tempFiles []string
 	defer func() { //nolint:contextcheck // Using context.Background() intentionally for cleanup

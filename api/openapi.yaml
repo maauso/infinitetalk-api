@@ -1,0 +1,242 @@
+openapi: 3.0.3
+info:
+  title: InfiniteTalk API
+  description: |
+    REST API for lip-sync video generation using RunPod.
+    
+    This API allows you to submit image and audio for lip-sync video generation,
+    track job progress, and retrieve the generated video.
+  version: 1.0.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns the health status of the service
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /jobs:
+    post:
+      summary: Create a new video generation job
+      description: |
+        Submit an image and audio for lip-sync video generation.
+        The job will be processed asynchronously.
+      operationId: createJob
+      tags:
+        - Jobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobRequest'
+      responses:
+        '202':
+          description: Job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateJobResponse'
+        '400':
+          description: Invalid request (validation error or invalid JSON)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /jobs/{id}:
+    get:
+      summary: Get job status and result
+      description: |
+        Retrieve the current status, progress, and optionally the result of a job.
+        If the job is completed and push_to_s3 was false, the video is returned
+        as base64 in the response body. If push_to_s3 was true, an S3 URL is returned.
+      operationId: getJob
+      tags:
+        - Jobs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the job
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '400':
+          description: Missing job ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Health status of the service
+          example: ok
+
+    CreateJobRequest:
+      type: object
+      required:
+        - image_base64
+        - audio_base64
+        - width
+        - height
+      properties:
+        image_base64:
+          type: string
+          format: byte
+          description: Base64-encoded source image
+        audio_base64:
+          type: string
+          format: byte
+          description: Base64-encoded source audio (WAV format)
+        width:
+          type: integer
+          minimum: 1
+          maximum: 4096
+          description: Target video width in pixels
+          example: 384
+        height:
+          type: integer
+          minimum: 1
+          maximum: 4096
+          description: Target video height in pixels
+          example: 576
+        push_to_s3:
+          type: boolean
+          default: false
+          description: Whether to upload the result to S3
+
+    CreateJobResponse:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the created job
+          example: job-1234567890-abc12345
+        status:
+          type: string
+          description: Initial job status
+          enum:
+            - IN_QUEUE
+          example: IN_QUEUE
+
+    JobResponse:
+      type: object
+      required:
+        - id
+        - status
+        - progress
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the job
+          example: job-1234567890-abc12345
+        status:
+          type: string
+          description: Current job status
+          enum:
+            - IN_QUEUE
+            - RUNNING
+            - COMPLETED
+            - FAILED
+            - CANCELLED
+            - TIMED_OUT
+          example: COMPLETED
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Job completion percentage
+          example: 100
+        error:
+          type: string
+          description: Error message if job failed
+        video_base64:
+          type: string
+          format: byte
+          description: Base64-encoded video content (if push_to_s3=false and completed)
+        video_url:
+          type: string
+          format: uri
+          description: S3 URL of the output video (if push_to_s3=true and completed)
+          example: https://s3.example.com/videos/job-123.mp4
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - code
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: job not found
+        code:
+          type: string
+          description: Error code for programmatic handling
+          enum:
+            - INVALID_JSON
+            - VALIDATION_ERROR
+            - JOB_CREATION_FAILED
+            - MISSING_JOB_ID
+            - JOB_NOT_FOUND
+            - JOB_FETCH_FAILED
+            - INTERNAL_ERROR
+          example: JOB_NOT_FOUND
+
+tags:
+  - name: Health
+    description: Service health endpoints
+  - name: Jobs
+    description: Video generation job management
