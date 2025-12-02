@@ -187,7 +187,7 @@ func (s *ProcessVideoService) ProcessExistingJob(ctx context.Context, jobID stri
 	// Retrieve the existing job
 	job, err := s.repo.FindByID(ctx, jobID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("find job: %w", err)
 	}
 
 	return s.processJob(ctx, job, input)
