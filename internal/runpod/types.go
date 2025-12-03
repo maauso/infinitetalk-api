@@ -6,12 +6,13 @@ type Status string
 
 // RunPod job statuses aligned with the RunPod API.
 const (
-	StatusInQueue   Status = "IN_QUEUE"
-	StatusRunning   Status = "RUNNING"
-	StatusCompleted Status = "COMPLETED"
-	StatusFailed    Status = "FAILED"
-	StatusCancelled Status = "CANCELLED"
-	StatusTimedOut  Status = "TIMED_OUT"
+	StatusInQueue    Status = "IN_QUEUE"
+	StatusRunning    Status = "RUNNING"
+	StatusInProgress Status = "IN_PROGRESS"
+	StatusCompleted  Status = "COMPLETED"
+	StatusFailed     Status = "FAILED"
+	StatusCancelled  Status = "CANCELLED"
+	StatusTimedOut   Status = "TIMED_OUT"
 )
 
 // IsTerminal returns true if the status is a terminal state.

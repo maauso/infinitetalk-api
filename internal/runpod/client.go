@@ -185,8 +185,28 @@ func (c *HTTPClient) Poll(ctx context.Context, jobID string) (PollResult, error)
 		return PollResult{}, err
 	}
 
+	var mapped Status
+	switch resp.Status {
+	case "IN_PROGRESS":
+		mapped = StatusInProgress
+	case "IN_QUEUE":
+		mapped = StatusInQueue
+	case "RUNNING":
+		mapped = StatusRunning
+	case "COMPLETED":
+		mapped = StatusCompleted
+	case "FAILED":
+		mapped = StatusFailed
+	case "CANCELLED":
+		mapped = StatusCancelled
+	case "TIMED_OUT":
+		mapped = StatusTimedOut
+	default:
+		mapped = Status(resp.Status)
+	}
+
 	result := PollResult{
-		Status: Status(resp.Status),
+		Status: mapped,
 	}
 
 	switch result.Status {
