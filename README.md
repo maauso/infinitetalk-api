@@ -80,7 +80,8 @@ curl -X POST http://localhost:8080/jobs \
     "audio_base64": "<base64-encoded-wav>",
     "width": 384,
     "height": 576,
-    "push_to_s3": false
+    "push_to_s3": false,
+    "dry_run": false
   }'
 ```
 
@@ -92,6 +93,8 @@ Response (`202 Accepted`):
   "status": "IN_QUEUE"
 }
 ```
+
+**Dry-Run Mode:** Set `"dry_run": true` to execute preprocessing (decode, resize, split) without calling RunPod. Useful for testing and validation. The job completes immediately after audio splitting.
 
 ### Poll Job Status
 

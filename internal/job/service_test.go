@@ -893,3 +893,79 @@ func TestFileToBase64_NonExistentFile(t *testing.T) {
 		t.Error("expected error for non-existent file")
 	}
 }
+
+func TestProcessVideoService_Process_DryRun(t *testing.T) {
+	svc, processor, splitter, runpodClient, storageClient, repo := newTestService(t)
+	ctx := context.Background()
+
+	imageData := []byte("test-image-data")
+	audioData := []byte("test-audio-data")
+	imageB64 := base64.StdEncoding.EncodeToString(imageData)
+	audioB64 := base64.StdEncoding.EncodeToString(audioData)
+
+	input := ProcessVideoInput{
+		ImageBase64: imageB64,
+		AudioBase64: audioB64,
+		Width:       384,
+		Height:      576,
+		PushToS3:    false,
+		DryRun:      true,
+	}
+
+	// Setup mock expectations - only preprocessing steps should be called
+	storageClient.On("SaveTemp", mock.Anything, "image.png", mock.Anything).Return("/tmp/image.png", nil).Once()
+	storageClient.On("SaveTemp", mock.Anything, "audio.wav", mock.Anything).Return("/tmp/audio.wav", nil).Once()
+	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
+
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+		Run(func(args mock.Arguments) {
+			dst := args.Get(2).(string)
+			_ = os.WriteFile(dst, imageData, 0644)
+		}).
+		Return(nil).Once()
+
+	splitter.On("Split", mock.Anything, "/tmp/audio.wav", "/tmp", mock.Anything).
+		Return([]string{"/tmp/chunk_0.wav", "/tmp/chunk_1.wav"}, nil).Once()
+
+	output, err := svc.Process(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if output.JobID == "" {
+		t.Error("expected JobID to be set")
+	}
+	if output.Status != StatusCompleted {
+		t.Errorf("expected status %s, got %s", StatusCompleted, output.Status)
+	}
+	if output.Error != "" {
+		t.Errorf("expected no error, got %s", output.Error)
+	}
+
+	// Verify job in repository
+	job, err := repo.FindByID(ctx, output.JobID)
+	if err != nil {
+		t.Fatalf("job should exist in repository: %v", err)
+	}
+	if job.Status != StatusCompleted {
+		t.Errorf("expected job status COMPLETED, got %s", job.Status)
+	}
+	if job.Progress != 100 {
+		t.Errorf("expected progress 100, got %d", job.Progress)
+	}
+	if len(job.Chunks) != 2 {
+		t.Errorf("expected 2 chunks, got %d", len(job.Chunks))
+	}
+
+	// Verify RunPod was NOT called (dry-run should skip it)
+	runpodClient.AssertNotCalled(t, "Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	runpodClient.AssertNotCalled(t, "Poll", mock.Anything, mock.Anything)
+
+	// Verify preprocessing mocks were called
+	processor.AssertExpectations(t)
+	splitter.AssertExpectations(t)
+	storageClient.AssertExpectations(t)
+
+	// Cleanup temp file created by test
+	os.Remove("/tmp/image.png")
+}

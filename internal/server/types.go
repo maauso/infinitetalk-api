@@ -14,6 +14,8 @@ type CreateJobRequest struct {
 	Height int `json:"height" validate:"required,min=1,max=4096"`
 	// PushToS3 indicates whether to upload the final video to S3.
 	PushToS3 bool `json:"push_to_s3"`
+	// DryRun skips RunPod calls and completes after preprocessing.
+	DryRun bool `json:"dry_run"`
 }
 
 // CreateJobResponse is the HTTP response after creating a job.
