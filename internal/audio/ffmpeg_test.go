@@ -354,3 +354,159 @@ func TestNewFFmpegSplitter_CustomPath(t *testing.T) {
 		t.Errorf("expected custom path, got '%s'", splitter.ffmpegPath)
 	}
 }
+
+func TestNewFFmpegSplitterWithProbe(t *testing.T) {
+	splitter := NewFFmpegSplitterWithProbe("/custom/ffmpeg", "/custom/ffprobe")
+	if splitter.ffmpegPath != "/custom/ffmpeg" {
+		t.Errorf("expected custom ffmpeg path, got '%s'", splitter.ffmpegPath)
+	}
+	if splitter.ffprobePath != "/custom/ffprobe" {
+		t.Errorf("expected custom ffprobe path, got '%s'", splitter.ffprobePath)
+	}
+}
+
+func TestNewFFmpegSplitterWithProbe_DefaultPaths(t *testing.T) {
+	splitter := NewFFmpegSplitterWithProbe("", "")
+	if splitter.ffmpegPath != "ffmpeg" {
+		t.Errorf("expected default ffmpeg path, got '%s'", splitter.ffmpegPath)
+	}
+	if splitter.ffprobePath != "ffprobe" {
+		t.Errorf("expected default ffprobe path, got '%s'", splitter.ffprobePath)
+	}
+}
+
+// checkFFprobe skips test if ffprobe is not available.
+func checkFFprobe(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("ffprobe"); err != nil {
+		t.Skip("ffprobe not found in PATH, skipping test")
+	}
+}
+
+func TestValidateChunk_ValidWAV(t *testing.T) {
+	checkFFmpeg(t)
+	checkFFprobe(t)
+
+	tmpDir := t.TempDir()
+	wavPath := filepath.Join(tmpDir, "test.wav")
+
+	// Create a simple test WAV file
+	createTestWAV(t, wavPath, 2, nil)
+
+	splitter := NewFFmpegSplitter("")
+	ctx := context.Background()
+
+	info, err := splitter.ValidateChunk(ctx, wavPath)
+	if err != nil {
+		t.Fatalf("ValidateChunk failed: %v", err)
+	}
+
+	if info.CodecName != "pcm_s16le" {
+		t.Errorf("expected codec 'pcm_s16le', got '%s'", info.CodecName)
+	}
+	if info.SampleRate != 16000 {
+		t.Errorf("expected sample rate 16000, got %d", info.SampleRate)
+	}
+	if info.Channels != 1 {
+		t.Errorf("expected 1 channel, got %d", info.Channels)
+	}
+	if info.Duration <= 0 {
+		t.Errorf("expected positive duration, got %.3f", info.Duration)
+	}
+}
+
+func TestValidateChunk_NonExistentFile(t *testing.T) {
+	checkFFprobe(t)
+
+	splitter := NewFFmpegSplitter("")
+	ctx := context.Background()
+
+	_, err := splitter.ValidateChunk(ctx, "/nonexistent/file.wav")
+	if err == nil {
+		t.Error("expected error for non-existent file")
+	}
+}
+
+func TestSplitProducesPCM16LE(t *testing.T) {
+	checkFFmpeg(t)
+	checkFFprobe(t)
+
+	// Create a 2-minute audio file with silences at ~45s and ~90s
+	tmpDir := t.TempDir()
+	inputPath := filepath.Join(tmpDir, "long.wav")
+	outputDir := filepath.Join(tmpDir, "output")
+
+	// Create 120 second audio with silences
+	silences := [][2]float64{
+		{44.0, 1.0}, // 1 second silence at 44s
+		{89.0, 1.0}, // 1 second silence at 89s
+	}
+	createTestWAV(t, inputPath, 120, silences)
+
+	splitter := NewFFmpegSplitter("")
+	opts := SplitOpts{
+		ChunkTargetSec:  45,
+		MinSilenceMs:    500,
+		SilenceThreshDB: -40,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	chunks, err := splitter.Split(ctx, inputPath, outputDir, opts)
+	if err != nil {
+		t.Fatalf("Split failed: %v", err)
+	}
+
+	// Verify all chunks are valid WAV with pcm_s16le codec
+	for i, chunk := range chunks {
+		info, err := splitter.ValidateChunk(ctx, chunk)
+		if err != nil {
+			t.Errorf("chunk %d validation failed: %v", i, err)
+			continue
+		}
+
+		if info.CodecName != "pcm_s16le" {
+			t.Errorf("chunk %d: expected codec 'pcm_s16le', got '%s'", i, info.CodecName)
+		}
+		if info.Duration <= 0 {
+			t.Errorf("chunk %d: expected positive duration, got %.3f", i, info.Duration)
+		}
+	}
+}
+
+func TestParseFFprobeOutput(t *testing.T) {
+	// Sample ffprobe JSON output
+	output := `{
+		"streams": [
+			{
+				"codec_name": "pcm_s16le",
+				"sample_rate": "16000",
+				"channels": 1,
+				"duration": "10.500000"
+			}
+		],
+		"format": {
+			"format_name": "wav",
+			"duration": "10.500000"
+		}
+	}`
+
+	info := parseFFprobeOutput(output)
+
+	if info.FormatName != "wav" {
+		t.Errorf("expected format_name 'wav', got '%s'", info.FormatName)
+	}
+	if info.CodecName != "pcm_s16le" {
+		t.Errorf("expected codec_name 'pcm_s16le', got '%s'", info.CodecName)
+	}
+	if info.SampleRate != 16000 {
+		t.Errorf("expected sample_rate 16000, got %d", info.SampleRate)
+	}
+	if info.Channels != 1 {
+		t.Errorf("expected channels 1, got %d", info.Channels)
+	}
+	if info.Duration != 10.5 {
+		t.Errorf("expected duration 10.5, got %.3f", info.Duration)
+	}
+}

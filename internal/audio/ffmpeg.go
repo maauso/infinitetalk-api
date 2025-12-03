@@ -20,7 +20,14 @@ var (
 	ErrInputNotFound = errors.New("input file does not exist")
 	// ErrParseDuration is returned when the duration cannot be parsed from ffmpeg output.
 	ErrParseDuration = errors.New("could not parse duration from ffmpeg output")
+	// ErrInvalidWAVFormat is returned when a chunk does not conform to WAV PCM format.
+	ErrInvalidWAVFormat = errors.New("invalid WAV format: expected pcm_s16le codec")
+	// ErrInvalidDuration is returned when a chunk has an invalid duration.
+	ErrInvalidDuration = errors.New("invalid chunk duration")
 )
+
+// codecPCM16LE is the expected codec name for valid WAV chunks.
+const codecPCM16LE = "pcm_s16le"
 
 // SilenceInterval represents a detected silence interval in the audio.
 type SilenceInterval struct {
@@ -28,18 +35,46 @@ type SilenceInterval struct {
 	End   float64
 }
 
+// WAVInfo contains validation information about a WAV file.
+type WAVInfo struct {
+	FormatName string
+	CodecName  string
+	SampleRate int
+	Channels   int
+	Duration   float64
+}
+
 // FFmpegSplitter implements Splitter using ffmpeg CLI.
 type FFmpegSplitter struct {
-	ffmpegPath string
+	ffmpegPath  string
+	ffprobePath string
 }
 
 // NewFFmpegSplitter creates a new FFmpegSplitter.
 // If ffmpegPath is empty, it defaults to "ffmpeg" (found in PATH).
+// If ffprobePath is empty, it defaults to "ffprobe" (found in PATH).
 func NewFFmpegSplitter(ffmpegPath string) *FFmpegSplitter {
 	if ffmpegPath == "" {
 		ffmpegPath = "ffmpeg"
 	}
-	return &FFmpegSplitter{ffmpegPath: ffmpegPath}
+	return &FFmpegSplitter{
+		ffmpegPath:  ffmpegPath,
+		ffprobePath: "ffprobe",
+	}
+}
+
+// NewFFmpegSplitterWithProbe creates a new FFmpegSplitter with custom paths.
+func NewFFmpegSplitterWithProbe(ffmpegPath, ffprobePath string) *FFmpegSplitter {
+	if ffmpegPath == "" {
+		ffmpegPath = "ffmpeg"
+	}
+	if ffprobePath == "" {
+		ffprobePath = "ffprobe"
+	}
+	return &FFmpegSplitter{
+		ffmpegPath:  ffmpegPath,
+		ffprobePath: ffprobePath,
+	}
 }
 
 // Split implements Splitter.Split using ffmpeg silencedetect and segment extraction.
@@ -309,16 +344,62 @@ func (s *FFmpegSplitter) extractChunks(ctx context.Context, inputPath, outputDir
 	return chunks, nil
 }
 
-// extractSegment extracts a portion of audio to a new file.
+// extractSegment extracts a portion of audio to a new WAV file with pcm_s16le encoding.
+// It places -ss after -i for precise seeking and uses -to for accurate timing.
+// If extraction or validation fails, it retries with normalized settings (16kHz mono).
 func (s *FFmpegSplitter) extractSegment(ctx context.Context, inputPath, outputPath string, start, duration float64) error {
+	// Try extraction with source sample rate/channels first
+	err := s.extractSegmentWithArgs(ctx, inputPath, outputPath, start, duration, nil)
+	if err == nil {
+		// Validate the output file format
+		info, validateErr := s.validateWAVChunk(ctx, outputPath)
+		if validateErr == nil && info.CodecName == codecPCM16LE && info.Duration > 0 {
+			return nil
+		}
+		// Validation failed, fall through to retry with normalization
+	}
+
+	// Retry with normalization: 16kHz mono
+	normalizeArgs := []string{"-ar", "16000", "-ac", "1"}
+	if retryErr := s.extractSegmentWithArgs(ctx, inputPath, outputPath, start, duration, normalizeArgs); retryErr != nil {
+		if err != nil {
+			return fmt.Errorf("extraction failed with normalization: %w", errors.Join(retryErr, err))
+		}
+		return fmt.Errorf("extraction failed with normalization: %w", retryErr)
+	}
+
+	// Validate after normalization
+	info, validateErr := s.validateWAVChunk(ctx, outputPath)
+	if validateErr != nil {
+		return fmt.Errorf("validation failed after normalization: %w", validateErr)
+	}
+	if info.CodecName != codecPCM16LE {
+		return fmt.Errorf("%w: got codec %s", ErrInvalidWAVFormat, info.CodecName)
+	}
+	if info.Duration <= 0 {
+		return fmt.Errorf("%w: %.3f", ErrInvalidDuration, info.Duration)
+	}
+
+	return nil
+}
+
+// extractSegmentWithArgs extracts audio segment with optional extra arguments.
+func (s *FFmpegSplitter) extractSegmentWithArgs(ctx context.Context, inputPath, outputPath string, start, duration float64, extraArgs []string) error {
+	// Build args: -y -i input -ss start -to end -vn -acodec pcm_s16le [extraArgs] output
+	// Place -ss after -i for precise seeking
+	endTime := start + duration
 	args := []string{
 		"-y", // Overwrite output
-		"-ss", fmt.Sprintf("%.3f", start),
-		"-t", fmt.Sprintf("%.3f", duration),
 		"-i", inputPath,
-		"-c", "copy", // Copy without re-encoding
-		outputPath,
+		"-ss", fmt.Sprintf("%.3f", start),
+		"-to", fmt.Sprintf("%.3f", endTime),
+		"-vn",                // No video
+		"-acodec", codecPCM16LE, // Force PCM 16-bit little-endian
 	}
+
+	// Add extra arguments (e.g., normalization)
+	args = append(args, extraArgs...)
+	args = append(args, outputPath)
 
 	// #nosec G204 - ffmpegPath is set by the application, not user input
 	cmd := exec.CommandContext(ctx, s.ffmpegPath, args...)
@@ -333,20 +414,64 @@ func (s *FFmpegSplitter) extractSegment(ctx context.Context, inputPath, outputPa
 	return nil
 }
 
-// copyAudio copies an audio file to a new location.
+// copyAudio copies an audio file to a new location as WAV with pcm_s16le encoding.
+// If the initial copy fails or validation fails, it retries with normalized settings (16kHz mono).
 func (s *FFmpegSplitter) copyAudio(ctx context.Context, src, dst string) error {
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(dst), 0750); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
 
-	// #nosec G204 - ffmpegPath is set by the application, not user input
-	cmd := exec.CommandContext(ctx, s.ffmpegPath,
+	// Try with source sample rate/channels first
+	err := s.copyAudioWithArgs(ctx, src, dst, nil)
+	if err == nil {
+		// Validate the output file format
+		info, validateErr := s.validateWAVChunk(ctx, dst)
+		if validateErr == nil && info.CodecName == codecPCM16LE && info.Duration > 0 {
+			return nil
+		}
+		// Validation failed, fall through to retry with normalization
+	}
+
+	// Retry with normalization: 16kHz mono
+	normalizeArgs := []string{"-ar", "16000", "-ac", "1"}
+	if retryErr := s.copyAudioWithArgs(ctx, src, dst, normalizeArgs); retryErr != nil {
+		if err != nil {
+			return fmt.Errorf("copy failed with normalization: %w", errors.Join(retryErr, err))
+		}
+		return fmt.Errorf("copy failed with normalization: %w", retryErr)
+	}
+
+	// Validate after normalization
+	info, validateErr := s.validateWAVChunk(ctx, dst)
+	if validateErr != nil {
+		return fmt.Errorf("validation failed after normalization: %w", validateErr)
+	}
+	if info.CodecName != codecPCM16LE {
+		return fmt.Errorf("%w: got codec %s", ErrInvalidWAVFormat, info.CodecName)
+	}
+	if info.Duration <= 0 {
+		return fmt.Errorf("%w: %.3f", ErrInvalidDuration, info.Duration)
+	}
+
+	return nil
+}
+
+// copyAudioWithArgs copies audio with optional extra arguments.
+func (s *FFmpegSplitter) copyAudioWithArgs(ctx context.Context, src, dst string, extraArgs []string) error {
+	args := []string{
 		"-y",
 		"-i", src,
-		"-c", "copy",
-		dst,
-	)
+		"-vn",                // No video
+		"-acodec", codecPCM16LE, // Force PCM 16-bit little-endian
+	}
+
+	// Add extra arguments (e.g., normalization)
+	args = append(args, extraArgs...)
+	args = append(args, dst)
+
+	// #nosec G204 - ffmpegPath is set by the application, not user input
+	cmd := exec.CommandContext(ctx, s.ffmpegPath, args...)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -356,6 +481,97 @@ func (s *FFmpegSplitter) copyAudio(ctx context.Context, src, dst string) error {
 	}
 
 	return nil
+}
+
+// validateWAVChunk uses ffprobe to verify that a file is a valid WAV with pcm_s16le codec.
+// Returns WAVInfo containing format details or an error if validation fails.
+func (s *FFmpegSplitter) validateWAVChunk(ctx context.Context, filePath string) (*WAVInfo, error) {
+	// Run ffprobe to get format info in JSON
+	// #nosec G204 - ffprobePath is set by the application, not user input
+	cmd := exec.CommandContext(ctx, s.ffprobePath,
+		"-v", "quiet",
+		"-show_format",
+		"-show_streams",
+		"-select_streams", "a:0",
+		"-of", "json",
+		filePath,
+	)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("ffprobe error: %w, stderr: %s", err, stderr.String())
+	}
+
+	// Parse JSON output
+	info := parseFFprobeOutput(stdout.String())
+
+	return info, nil
+}
+
+// parseFFprobeOutput parses ffprobe JSON output to extract WAV info.
+func parseFFprobeOutput(output string) *WAVInfo {
+	// Simple regex-based parsing to avoid adding JSON dependency
+	info := &WAVInfo{}
+
+	// Extract format_name
+	formatRe := regexp.MustCompile(`"format_name"\s*:\s*"([^"]+)"`)
+	if match := formatRe.FindStringSubmatch(output); len(match) > 1 {
+		info.FormatName = match[1]
+	}
+
+	// Extract codec_name
+	codecRe := regexp.MustCompile(`"codec_name"\s*:\s*"([^"]+)"`)
+	if match := codecRe.FindStringSubmatch(output); len(match) > 1 {
+		info.CodecName = match[1]
+	}
+
+	// Extract sample_rate
+	sampleRateRe := regexp.MustCompile(`"sample_rate"\s*:\s*"(\d+)"`)
+	if match := sampleRateRe.FindStringSubmatch(output); len(match) > 1 {
+		if rate, err := strconv.Atoi(match[1]); err == nil {
+			info.SampleRate = rate
+		}
+	}
+
+	// Extract channels
+	channelsRe := regexp.MustCompile(`"channels"\s*:\s*(\d+)`)
+	if match := channelsRe.FindStringSubmatch(output); len(match) > 1 {
+		if ch, err := strconv.Atoi(match[1]); err == nil {
+			info.Channels = ch
+		}
+	}
+
+	// Extract duration (from format section)
+	durationRe := regexp.MustCompile(`"duration"\s*:\s*"?([\d.]+)"?`)
+	if match := durationRe.FindStringSubmatch(output); len(match) > 1 {
+		if dur, err := strconv.ParseFloat(match[1], 64); err == nil {
+			info.Duration = dur
+		}
+	}
+
+	return info
+}
+
+// ValidateChunk validates that a chunk file is a valid WAV with pcm_s16le encoding.
+// This is a public utility function for external validation.
+func (s *FFmpegSplitter) ValidateChunk(ctx context.Context, filePath string) (*WAVInfo, error) {
+	info, err := s.validateWAVChunk(ctx, filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for valid WAV format
+	if info.CodecName != codecPCM16LE {
+		return info, fmt.Errorf("%w: got codec %s", ErrInvalidWAVFormat, info.CodecName)
+	}
+	if info.Duration <= 0 {
+		return info, fmt.Errorf("%w: %.3f", ErrInvalidDuration, info.Duration)
+	}
+
+	return info, nil
 }
 
 // GetSilences is a utility function to get silence intervals from an audio file.
