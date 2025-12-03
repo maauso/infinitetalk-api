@@ -29,6 +29,15 @@ var (
 // codecPCM16LE is the expected codec name for valid WAV chunks.
 const codecPCM16LE = "pcm_s16le"
 
+// Pre-compiled regular expressions for ffprobe output parsing.
+var (
+	reFormatName = regexp.MustCompile(`"format_name"\s*:\s*"([^"]+)"`)
+	reCodecName  = regexp.MustCompile(`"codec_name"\s*:\s*"([^"]+)"`)
+	reSampleRate = regexp.MustCompile(`"sample_rate"\s*:\s*"(\d+)"`)
+	reChannels   = regexp.MustCompile(`"channels"\s*:\s*(\d+)`)
+	reDuration   = regexp.MustCompile(`"duration"\s*:\s*"?([\d.]+)"?`)
+)
+
 // SilenceInterval represents a detected silence interval in the audio.
 type SilenceInterval struct {
 	Start float64
@@ -513,40 +522,35 @@ func (s *FFmpegSplitter) validateWAVChunk(ctx context.Context, filePath string) 
 
 // parseFFprobeOutput parses ffprobe JSON output to extract WAV info.
 func parseFFprobeOutput(output string) *WAVInfo {
-	// Simple regex-based parsing to avoid adding JSON dependency
+	// Simple regex-based parsing using pre-compiled patterns
 	info := &WAVInfo{}
 
 	// Extract format_name
-	formatRe := regexp.MustCompile(`"format_name"\s*:\s*"([^"]+)"`)
-	if match := formatRe.FindStringSubmatch(output); len(match) > 1 {
+	if match := reFormatName.FindStringSubmatch(output); len(match) > 1 {
 		info.FormatName = match[1]
 	}
 
 	// Extract codec_name
-	codecRe := regexp.MustCompile(`"codec_name"\s*:\s*"([^"]+)"`)
-	if match := codecRe.FindStringSubmatch(output); len(match) > 1 {
+	if match := reCodecName.FindStringSubmatch(output); len(match) > 1 {
 		info.CodecName = match[1]
 	}
 
 	// Extract sample_rate
-	sampleRateRe := regexp.MustCompile(`"sample_rate"\s*:\s*"(\d+)"`)
-	if match := sampleRateRe.FindStringSubmatch(output); len(match) > 1 {
+	if match := reSampleRate.FindStringSubmatch(output); len(match) > 1 {
 		if rate, err := strconv.Atoi(match[1]); err == nil {
 			info.SampleRate = rate
 		}
 	}
 
 	// Extract channels
-	channelsRe := regexp.MustCompile(`"channels"\s*:\s*(\d+)`)
-	if match := channelsRe.FindStringSubmatch(output); len(match) > 1 {
+	if match := reChannels.FindStringSubmatch(output); len(match) > 1 {
 		if ch, err := strconv.Atoi(match[1]); err == nil {
 			info.Channels = ch
 		}
 	}
 
 	// Extract duration (from format section)
-	durationRe := regexp.MustCompile(`"duration"\s*:\s*"?([\d.]+)"?`)
-	if match := durationRe.FindStringSubmatch(output); len(match) > 1 {
+	if match := reDuration.FindStringSubmatch(output); len(match) > 1 {
 		if dur, err := strconv.ParseFloat(match[1], 64); err == nil {
 			info.Duration = dur
 		}
