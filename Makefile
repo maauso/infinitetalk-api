@@ -14,7 +14,7 @@ MOCKERY_CMD := $(if $(MOCKERY_BIN),$(MOCKERY_BIN),docker run --rm -v "$(PWD)":/s
 
 # Build the application binary
 build:
-	$(GO) build -o infinitetalk-api .
+	$(GO) build -o infinitetalk-api ./cmd/server
 
 # Run tests with race detection
 test:
