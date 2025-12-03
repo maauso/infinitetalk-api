@@ -16,10 +16,10 @@ import (
 
 // Handlers contains the HTTP handlers for the API.
 type Handlers struct {
-	service             *job.ProcessVideoService
-	validator           *validator.Validate
-	logger              *slog.Logger
-	enableAsyncProcess  bool
+	service            *job.ProcessVideoService
+	validator          *validator.Validate
+	logger             *slog.Logger
+	enableAsyncProcess bool
 }
 
 // HandlerOption is a function that configures a Handlers instance.
