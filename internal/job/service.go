@@ -648,7 +648,7 @@ func (s *ProcessVideoService) pollForResult(ctx context.Context, jobID string, c
 				return "", ErrRunPodJobCancelled
 			case runpod.StatusTimedOut:
 				return "", ErrRunPodJobTimedOut
-			case runpod.StatusInQueue, runpod.StatusRunning:
+			case runpod.StatusInQueue, runpod.StatusRunning, runpod.StatusInProgress:
 				// Continue polling
 			default:
 				s.logger.Warn("unknown RunPod status",

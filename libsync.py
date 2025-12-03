@@ -10,9 +10,9 @@ from PIL import Image
 from datetime import datetime
 
 # ================= CONFIGURACIÓN =================
-API_KEY = "rpa_RGG8KZFQHRGCLV47HJVJ9TK32YUK1N9SWTZPJSSX1kupax"
-# ENDPOINT_ID = "ef2k83wtsgxj6z"  # Endpoint por defecto
-ENDPOINT_ID = "d48rp54wrgex2l"  # Endpoint optimizado para velocidad
+API_KEY = "your_runpod_api_key_here"
+# ENDPOINT_ID = "xxxxx"  # Endpoint por defecto
+ENDPOINT_ID = "xxxxxxx"  # Endpoint optimizado para velocidad
 
 # La imagen base (Avatar) que se usará para todo el video
 INPUT_IMAGE = "./avatar_img/source.png"
