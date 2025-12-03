@@ -7,6 +7,9 @@ type CreateJobRequest struct {
 	// ImageBase64 is the base64-encoded source image.
 	ImageBase64 string `json:"image_base64" validate:"required,base64"`
 	// AudioBase64 is the base64-encoded source audio.
+	// The audio will be processed and split into WAV PCM (pcm_s16le) chunks
+	// to ensure compatibility with RunPod workers (PyAV/librosa).
+	// Supported input formats: WAV, MP3, AAC, and other ffmpeg-compatible formats.
 	AudioBase64 string `json:"audio_base64" validate:"required,base64"`
 	// Width is the target video width.
 	Width int `json:"width" validate:"required,min=1,max=4096"`

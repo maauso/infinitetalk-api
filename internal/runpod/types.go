@@ -56,6 +56,8 @@ type runInput struct {
 	PersonCount   string `json:"person_count"`
 	Prompt        string `json:"prompt"`
 	ImageBase64   string `json:"image_base64"`
+	// WavBase64 contains base64-encoded WAV audio in pcm_s16le format.
+	// This format ensures maximum compatibility with PyAV/librosa decoders.
 	WavBase64     string `json:"wav_base64"`
 	Width         int    `json:"width"`
 	Height        int    `json:"height"`
