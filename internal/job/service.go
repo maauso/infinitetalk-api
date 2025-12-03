@@ -42,6 +42,8 @@ type ProcessVideoInput struct {
 	Height int
 	// PushToS3 indicates whether to upload the final video to S3.
 	PushToS3 bool
+	// DryRun skips RunPod calls and completes after preprocessing.
+	DryRun bool
 }
 
 // ProcessVideoOutput contains the result of video processing.
@@ -333,6 +335,25 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 	job.SetChunks(chunks)
 	if err := s.repo.Save(ctx, job); err != nil {
 		return nil, fmt.Errorf("save job: %w", err)
+	}
+
+	// Dry-run mode: skip RunPod processing and complete immediately
+	if input.DryRun {
+		s.logger.Info("dry-run mode: skipping RunPod processing",
+			slog.String("job_id", job.ID),
+			slog.Int("chunk_count", len(audioChunks)),
+		)
+		job.UpdateProgress(100)
+		if err := job.Complete(); err != nil {
+			return nil, fmt.Errorf("complete job: %w", err)
+		}
+		if err := s.repo.Save(ctx, job); err != nil {
+			return nil, fmt.Errorf("save job: %w", err)
+		}
+		return &ProcessVideoOutput{
+			JobID:  job.ID,
+			Status: job.Status,
+		}, nil
 	}
 
 	// Step 5: Process chunks in parallel with semaphore

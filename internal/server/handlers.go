@@ -83,6 +83,7 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		Width:       req.Width,
 		Height:      req.Height,
 		PushToS3:    req.PushToS3,
+		DryRun:      req.DryRun,
 	}
 
 	// Create job first (synchronously)
