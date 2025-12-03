@@ -155,7 +155,8 @@ Long audio files are split into smaller chunks for efficient processing. The spl
 
 1. **Detect silences** — Run `ffmpeg -af silencedetect=noise=-40dB:d=0.5 -f null -` and parse output for silence intervals.
 2. **Plan cuts** — Select cut points near the target chunk duration (default 45s), preferring silence boundaries.
-3. **Extract segments** — Use `ffmpeg -ss START -to END -c copy` to extract each chunk.
+3. **Extract segments** — Re-encode each segment to WAV PCM (`pcm_s16le`) format for maximum compatibility.
+4. **Validate chunks** — Use `ffprobe` to verify each chunk has correct format, codec, and duration.
 
 **Parameters:**
 
@@ -166,6 +167,19 @@ Long audio files are split into smaller chunks for efficient processing. The spl
 | Min silence duration | `500 ms` | Minimum silence length to consider as a cut point |
 
 This approach minimizes audible artifacts by avoiding cuts in the middle of speech.
+
+## Audio Format Requirements
+
+The API exclusively uses **WAV PCM (pcm_s16le)** format for audio chunks to ensure maximum compatibility with RunPod workers (PyAV/librosa).
+
+- All audio chunks are re-encoded to `pcm_s16le` during splitting.
+- If encoding fails, the system automatically retries with normalized settings (16kHz mono).
+- Each chunk is validated with `ffprobe` to ensure:
+  - Format: `wav`
+  - Codec: `pcm_s16le`
+  - Duration: > 0 seconds
+
+This ensures that RunPod/ComfyUI can decode audio without "Invalid data found when processing input" errors.
 
 ## Repository Layout
 
