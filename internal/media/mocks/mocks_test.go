@@ -37,6 +37,74 @@ func (_m *MockProcessor) EXPECT() *MockProcessor_Expecter {
 	return &MockProcessor_Expecter{mock: &_m.Mock}
 }
 
+// ExtractLastFrame provides a mock function for the type MockProcessor
+func (_mock *MockProcessor) ExtractLastFrame(ctx context.Context, videoPath string) ([]byte, error) {
+	ret := _mock.Called(ctx, videoPath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExtractLastFrame")
+	}
+
+	var r0 []byte
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]byte, error)); ok {
+		return returnFunc(ctx, videoPath)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []byte); ok {
+		r0 = returnFunc(ctx, videoPath)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, videoPath)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockProcessor_ExtractLastFrame_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExtractLastFrame'
+type MockProcessor_ExtractLastFrame_Call struct {
+	*mock.Call
+}
+
+// ExtractLastFrame is a helper method to define mock.On call
+//   - ctx context.Context
+//   - videoPath string
+func (_e *MockProcessor_Expecter) ExtractLastFrame(ctx interface{}, videoPath interface{}) *MockProcessor_ExtractLastFrame_Call {
+	return &MockProcessor_ExtractLastFrame_Call{Call: _e.mock.On("ExtractLastFrame", ctx, videoPath)}
+}
+
+func (_c *MockProcessor_ExtractLastFrame_Call) Run(run func(ctx context.Context, videoPath string)) *MockProcessor_ExtractLastFrame_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockProcessor_ExtractLastFrame_Call) Return(bytes []byte, err error) *MockProcessor_ExtractLastFrame_Call {
+	_c.Call.Return(bytes, err)
+	return _c
+}
+
+func (_c *MockProcessor_ExtractLastFrame_Call) RunAndReturn(run func(ctx context.Context, videoPath string) ([]byte, error)) *MockProcessor_ExtractLastFrame_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // JoinVideos provides a mock function for the type MockProcessor
 func (_mock *MockProcessor) JoinVideos(ctx context.Context, videoPaths []string, output string) error {
 	ret := _mock.Called(ctx, videoPaths, output)

@@ -40,7 +40,6 @@ func run() error {
 		slog.String("log_format", cfg.LogFormat),
 		slog.String("log_level", cfg.LogLevel),
 		slog.String("temp_dir", cfg.TempDir),
-		slog.Int("max_concurrent_chunks", cfg.MaxConcurrentChunks),
 		slog.Int("chunk_target_sec", cfg.ChunkTargetSec),
 		slog.Bool("s3_enabled", cfg.S3Enabled()),
 	)

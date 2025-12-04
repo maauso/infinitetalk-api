@@ -17,7 +17,6 @@ func TestLoad_RequiredVariables(t *testing.T) {
 		os.Unsetenv("RUNPOD_API_KEY")
 		os.Unsetenv("RUNPOD_ENDPOINT_ID")
 		os.Unsetenv("TEMP_DIR")
-		os.Unsetenv("MAX_CONCURRENT_CHUNKS")
 		os.Unsetenv("CHUNK_TARGET_SEC")
 		os.Unsetenv("S3_BUCKET")
 		os.Unsetenv("S3_REGION")
@@ -66,7 +65,6 @@ func TestLoad_Defaults(t *testing.T) {
 
 	assert.Equal(t, 8080, cfg.Port)
 	assert.Equal(t, "/tmp/infinitetalk", cfg.TempDir)
-	assert.Equal(t, 3, cfg.MaxConcurrentChunks)
 	assert.Equal(t, 45, cfg.ChunkTargetSec)
 	assert.Equal(t, "text", cfg.LogFormat)
 	assert.Equal(t, "info", cfg.LogLevel)
@@ -77,7 +75,6 @@ func TestLoad_CustomValues(t *testing.T) {
 	t.Setenv("RUNPOD_ENDPOINT_ID", "custom-endpoint")
 	t.Setenv("PORT", "3000")
 	t.Setenv("TEMP_DIR", "/custom/temp")
-	t.Setenv("MAX_CONCURRENT_CHUNKS", "5")
 	t.Setenv("CHUNK_TARGET_SEC", "60")
 	t.Setenv("S3_BUCKET", "my-bucket")
 	t.Setenv("S3_REGION", "us-east-1")
@@ -91,7 +88,6 @@ func TestLoad_CustomValues(t *testing.T) {
 
 	assert.Equal(t, 3000, cfg.Port)
 	assert.Equal(t, "/custom/temp", cfg.TempDir)
-	assert.Equal(t, 5, cfg.MaxConcurrentChunks)
 	assert.Equal(t, 60, cfg.ChunkTargetSec)
 	assert.Equal(t, "my-bucket", cfg.S3Bucket)
 	assert.Equal(t, "us-east-1", cfg.S3Region)
@@ -105,7 +101,7 @@ func TestLoad_InvalidIntegerDefaults(t *testing.T) {
 	t.Setenv("RUNPOD_API_KEY", "test-api-key")
 	t.Setenv("RUNPOD_ENDPOINT_ID", "test-endpoint")
 	t.Setenv("PORT", "not-a-number")
-	t.Setenv("MAX_CONCURRENT_CHUNKS", "invalid")
+	t.Setenv("CHUNK_TARGET_SEC", "invalid")
 
 	// go-envconfig returns an error when parsing fails
 	_, err := Load()
@@ -138,16 +134,15 @@ func TestConfig_S3Enabled(t *testing.T) {
 
 func TestConfig_String(t *testing.T) {
 	cfg := &Config{
-		Port:                8080,
-		RunPodAPIKey:       "secret-key",
-		RunPodEndpointID:   "endpoint-123",
-		TempDir:            "/tmp/test",
-		MaxConcurrentChunks: 3,
-		ChunkTargetSec:     45,
-		S3Bucket:           "bucket",
-		S3Region:           "region",
-		LogFormat:          "json",
-		LogLevel:           "info",
+		Port:             8080,
+		RunPodAPIKey:     "secret-key",
+		RunPodEndpointID: "endpoint-123",
+		TempDir:          "/tmp/test",
+		ChunkTargetSec:   45,
+		S3Bucket:         "bucket",
+		S3Region:         "region",
+		LogFormat:        "json",
+		LogLevel:         "info",
 	}
 
 	str := cfg.String()
