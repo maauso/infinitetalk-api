@@ -126,7 +126,7 @@ func NewProcessVideoService(
 		runpod:              runpodClient,
 		storage:             storageClient,
 		logger:              logger,
-		maxConcurrentChunks: 3, // Default concurrency
+		maxConcurrentChunks: 1, // Default concurrency
 		splitOpts:           audio.DefaultSplitOpts(),
 		pollInterval:        5 * time.Second,
 	}
@@ -638,27 +638,57 @@ func (s *ProcessVideoService) pollForResult(ctx context.Context, jobID string, c
 	ticker := time.NewTicker(s.pollInterval)
 	defer ticker.Stop()
 
+	var (
+		attempt    int
+		prevStatus runpod.Status
+	)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return "", fmt.Errorf("context cancelled: %w", ctx.Err())
 		case <-ticker.C:
+			attempt++
 			result, err := s.runpod.Poll(ctx, runpodJobID)
 			if err != nil {
 				s.logger.Warn("poll error, retrying",
 					slog.String("job_id", jobID),
 					slog.Int("chunk_index", chunkIdx),
 					slog.String("runpod_job_id", runpodJobID),
+					slog.Int("attempt", attempt),
 					slog.String("error", err.Error()),
 				)
 				continue
 			}
 
-			s.logger.Debug("poll result",
+			// Log an update on every poll iteration so callers see progress
+			s.logger.Info("runpod poll update",
 				slog.String("job_id", jobID),
 				slog.Int("chunk_index", chunkIdx),
+				slog.String("runpod_job_id", runpodJobID),
+				slog.Int("attempt", attempt),
 				slog.String("status", string(result.Status)),
 			)
+			if result.Error != "" {
+				s.logger.Info("runpod reported error",
+					slog.String("job_id", jobID),
+					slog.Int("chunk_index", chunkIdx),
+					slog.String("runpod_job_id", runpodJobID),
+					slog.String("error", result.Error),
+				)
+			}
+
+			// If status changed since last poll, record it at info level.
+			if result.Status != prevStatus {
+				s.logger.Info("runpod status changed",
+					slog.String("job_id", jobID),
+					slog.Int("chunk_index", chunkIdx),
+					slog.String("runpod_job_id", runpodJobID),
+					slog.String("from", string(prevStatus)),
+					slog.String("to", string(result.Status)),
+				)
+				prevStatus = result.Status
+			}
 
 			switch result.Status {
 			case runpod.StatusCompleted:
