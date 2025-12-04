@@ -126,7 +126,7 @@ func NewProcessVideoService(
 		runpod:              runpodClient,
 		storage:             storageClient,
 		logger:              logger,
-		maxConcurrentChunks: 1, // Default concurrency
+		maxConcurrentChunks: 3, // Default concurrency
 		splitOpts:           audio.DefaultSplitOpts(),
 		pollInterval:        5 * time.Second,
 	}
