@@ -739,3 +739,55 @@ func (s *ProcessVideoService) failJob(ctx context.Context, job *Job, errMsg stri
 		Error:  errMsg,
 	}, nil
 }
+
+// DeleteJobVideo deletes the local video file for a job and clears output metadata.
+// This operation is idempotent - it returns success even if the file is already missing.
+// Returns ErrJobNotFound if the job does not exist.
+func (s *ProcessVideoService) DeleteJobVideo(ctx context.Context, jobID string) error {
+	// Find the job
+	job, err := s.repo.FindByID(ctx, jobID)
+	if err != nil {
+		return fmt.Errorf("find job: %w", err)
+	}
+
+	s.logger.Info("deleting job video",
+		slog.String("job_id", jobID),
+		slog.String("output_path", job.OutputVideoPath),
+	)
+
+	// If there's an output path, attempt to delete the file
+	if job.OutputVideoPath != "" {
+		if err := os.Remove(job.OutputVideoPath); err != nil {
+			// Treat file not found as success (idempotent)
+			if !os.IsNotExist(err) {
+				s.logger.Error("failed to delete video file",
+					slog.String("job_id", jobID),
+					slog.String("path", job.OutputVideoPath),
+					slog.String("error", err.Error()),
+				)
+				return fmt.Errorf("delete video file: %w", err)
+			}
+			s.logger.Info("video file already missing (idempotent delete)",
+				slog.String("job_id", jobID),
+				slog.String("path", job.OutputVideoPath),
+			)
+		} else {
+			s.logger.Info("video file deleted",
+				slog.String("job_id", jobID),
+				slog.String("path", job.OutputVideoPath),
+			)
+		}
+	}
+
+	// Clear output metadata and persist
+	job.ClearOutput()
+	if err := s.repo.Save(ctx, job); err != nil {
+		return fmt.Errorf("save job: %w", err)
+	}
+
+	s.logger.Info("job video deletion completed",
+		slog.String("job_id", jobID),
+	)
+
+	return nil
+}

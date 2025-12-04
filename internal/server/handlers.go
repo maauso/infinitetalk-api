@@ -174,6 +174,31 @@ func (h *Handlers) GetJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// DeleteJobVideo handles POST /jobs/{id}/video/delete requests.
+func (h *Handlers) DeleteJobVideo(w http.ResponseWriter, r *http.Request) {
+	jobID := r.PathValue("id")
+	if jobID == "" {
+		writeError(w, http.StatusBadRequest, "job ID is required", "MISSING_JOB_ID")
+		return
+	}
+
+	err := h.service.DeleteJobVideo(r.Context(), jobID)
+	if err != nil {
+		if errors.Is(err, job.ErrJobNotFound) {
+			writeError(w, http.StatusNotFound, "job not found", "JOB_NOT_FOUND")
+			return
+		}
+		h.logger.Error("failed to delete job video",
+			slog.String("job_id", jobID),
+			slog.String("error", err.Error()),
+		)
+		writeError(w, http.StatusInternalServerError, "failed to delete video", "VIDEO_DELETE_FAILED")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // writeJSON writes a JSON response.
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")

@@ -115,6 +115,25 @@ Response when completed:
 
 If `push_to_s3` was `true`, the response contains `video_url` instead.
 
+### Delete Job Video
+
+Delete the local video file for a completed job. This endpoint is idempotent — it returns success even if the file is already missing.
+
+```bash
+curl -X POST http://localhost:8080/jobs/{id}/video/delete
+```
+
+Response: `204 No Content` on success.
+
+If the job does not exist, returns `404 Not Found`:
+
+```json
+{
+  "error": "job not found",
+  "code": "JOB_NOT_FOUND"
+}
+```
+
 ### Health Check
 
 ```bash

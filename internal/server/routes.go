@@ -27,6 +27,7 @@ func NewRouter(h *Handlers, logger *slog.Logger, cfg Config) http.Handler {
 	mux.HandleFunc("GET /health", h.Health)
 	mux.HandleFunc("POST /jobs", h.CreateJob)
 	mux.HandleFunc("GET /jobs/{id}", h.GetJob)
+	mux.HandleFunc("POST /jobs/{id}/video/delete", h.DeleteJobVideo)
 
 	// Apply middleware chain
 	chain := ChainMiddleware(
