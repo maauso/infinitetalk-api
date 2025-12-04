@@ -41,4 +41,5 @@ infinitetalk-api
 
 # Binary output
 infinitetalk-api
+server
 *__debug_*

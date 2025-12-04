@@ -641,6 +641,7 @@ func (s *ProcessVideoService) pollForResult(ctx context.Context, jobID string, c
 	var (
 		attempt    int
 		prevStatus runpod.Status
+		firstPoll  = true
 	)
 
 	for {
@@ -675,9 +676,29 @@ func (s *ProcessVideoService) pollForResult(ctx context.Context, jobID string, c
 				slog.String("prev_status", string(prevStatus)),
 				slog.String("error", result.Error),
 			)
-			if result.Status != prevStatus {
-				prevStatus = result.Status
+
+			if result.Error != "" {
+				s.logger.Info("runpod reported error",
+					slog.String("job_id", jobID),
+					slog.Int("chunk_index", chunkIdx),
+					slog.String("runpod_job_id", runpodJobID),
+					slog.String("error", result.Error),
+				)
 			}
+
+			// If status changed since last poll (and not first poll), record it at info level.
+			if result.Status != prevStatus && !firstPoll {
+				s.logger.Info("runpod status changed",
+					slog.String("job_id", jobID),
+					slog.Int("chunk_index", chunkIdx),
+					slog.String("runpod_job_id", runpodJobID),
+					slog.String("from", string(prevStatus)),
+					slog.String("to", string(result.Status)),
+				)
+
+			}
+			firstPoll = false
+			prevStatus = result.Status
 
 			switch result.Status {
 			case runpod.StatusCompleted:
