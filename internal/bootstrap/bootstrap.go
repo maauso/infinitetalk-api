@@ -54,7 +54,6 @@ func NewDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, er
 		runpodClient,
 		store,
 		logger,
-		job.WithMaxConcurrentChunks(cfg.MaxConcurrentChunks),
 		job.WithSplitOpts(splitOpts),
 	)
 

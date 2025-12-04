@@ -33,8 +33,7 @@ type Config struct {
 	TempDir string `env:"TEMP_DIR, default=/tmp/infinitetalk" json:"temp_dir"`
 
 	// Processing settings
-	MaxConcurrentChunks int `env:"MAX_CONCURRENT_CHUNKS, default=3" json:"max_concurrent_chunks"`
-	ChunkTargetSec      int `env:"CHUNK_TARGET_SEC, default=45" json:"chunk_target_sec"`
+	ChunkTargetSec int `env:"CHUNK_TARGET_SEC, default=45" json:"chunk_target_sec"`
 
 	// Optional S3 settings
 	S3Bucket           string `env:"S3_BUCKET" json:"s3_bucket,omitempty"`
@@ -105,11 +104,10 @@ func (c *Config) NewLogger() *slog.Logger {
 // String returns a string representation of the config with sensitive values masked.
 func (c *Config) String() string {
 	return fmt.Sprintf(
-		"Config{Port: %d, RunPodEndpointID: %s, TempDir: %s, MaxConcurrentChunks: %d, ChunkTargetSec: %d, S3Bucket: %s, S3Region: %s, LogFormat: %s, LogLevel: %s}",
+		"Config{Port: %d, RunPodEndpointID: %s, TempDir: %s, ChunkTargetSec: %d, S3Bucket: %s, S3Region: %s, LogFormat: %s, LogLevel: %s}",
 		c.Port,
 		c.RunPodEndpointID,
 		c.TempDir,
-		c.MaxConcurrentChunks,
 		c.ChunkTargetSec,
 		c.S3Bucket,
 		c.S3Region,

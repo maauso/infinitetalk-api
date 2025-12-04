@@ -193,3 +193,33 @@ func (e *FFmpegError) Error() string {
 func (e *FFmpegError) Unwrap() error {
 	return e.Err
 }
+
+// ExtractLastFrame extracts the last frame from a video file as a PNG image.
+func (p *FFmpegProcessor) ExtractLastFrame(ctx context.Context, videoPath string) ([]byte, error) {
+	// Create temp file for output
+	outputImg := videoPath + "_last_frame.png"
+	defer func() { _ = os.Remove(outputImg) }() // Cleanup temp file
+
+	// -sseof -1: Seek to 1 second before end (fast, no full file read)
+	// -frames:v 1: Extract only 1 frame
+	// -update 1: Overwrite if exists
+	args := []string{
+		"-y",           // Overwrite output
+		"-sseof", "-1", // Seek to 1 second before end
+		"-i", videoPath,
+		"-frames:v", "1",
+		"-update", "1",
+		outputImg,
+	}
+
+	if err := p.runFFmpeg(ctx, args); err != nil {
+		return nil, fmt.Errorf("extract last frame: %w", err)
+	}
+
+	data, err := os.ReadFile(outputImg) // #nosec G304 - outputImg constructed internally
+	if err != nil {
+		return nil, fmt.Errorf("read extracted frame: %w", err)
+	}
+
+	return data, nil
+}

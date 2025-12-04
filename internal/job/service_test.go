@@ -34,6 +34,14 @@ func (m *mockProcessor) JoinVideos(ctx context.Context, videoPaths []string, out
 	return args.Error(0)
 }
 
+func (m *mockProcessor) ExtractLastFrame(ctx context.Context, videoPath string) ([]byte, error) {
+	args := m.Called(ctx, videoPath)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]byte), args.Error(1)
+}
+
 // mockSplitter implements audio.Splitter for testing
 type mockSplitter struct {
 	mock.Mock
@@ -121,9 +129,6 @@ func TestNewProcessVideoService(t *testing.T) {
 	if svc.repo != repo {
 		t.Error("expected repo to be set")
 	}
-	if svc.maxConcurrentChunks != 3 {
-		t.Errorf("expected maxConcurrentChunks 3, got %d", svc.maxConcurrentChunks)
-	}
 
 	// With custom logger
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -141,39 +146,15 @@ func TestNewProcessVideoService_WithOptions(t *testing.T) {
 	storageClient := &mockStorage{}
 
 	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, nil,
-		WithMaxConcurrentChunks(5),
 		WithSplitOpts(audio.SplitOpts{ChunkTargetSec: 30}),
 		WithPollInterval(10*time.Second),
 	)
 
-	if svc.maxConcurrentChunks != 5 {
-		t.Errorf("expected maxConcurrentChunks 5, got %d", svc.maxConcurrentChunks)
-	}
 	if svc.splitOpts.ChunkTargetSec != 30 {
 		t.Errorf("expected ChunkTargetSec 30, got %d", svc.splitOpts.ChunkTargetSec)
 	}
 	if svc.pollInterval != 10*time.Second {
 		t.Errorf("expected pollInterval 10s, got %v", svc.pollInterval)
-	}
-}
-
-func TestProcessVideoService_SetMaxConcurrentChunks(t *testing.T) {
-	svc, _, _, _, _, _ := newTestService(t)
-
-	svc.SetMaxConcurrentChunks(5)
-	if svc.maxConcurrentChunks != 5 {
-		t.Errorf("expected 5, got %d", svc.maxConcurrentChunks)
-	}
-
-	// Invalid value should be ignored
-	svc.SetMaxConcurrentChunks(0)
-	if svc.maxConcurrentChunks != 5 {
-		t.Errorf("expected 5 (unchanged), got %d", svc.maxConcurrentChunks)
-	}
-
-	svc.SetMaxConcurrentChunks(-1)
-	if svc.maxConcurrentChunks != 5 {
-		t.Errorf("expected 5 (unchanged), got %d", svc.maxConcurrentChunks)
 	}
 }
 
@@ -710,6 +691,9 @@ func TestProcessVideoService_Process_MultipleChunks(t *testing.T) {
 		}).
 		Return(nil).Once()
 	processor.On("JoinVideos", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	// ExtractLastFrame is called for each chunk except the last one (3 chunks = 2 calls)
+	processor.On("ExtractLastFrame", mock.Anything, mock.AnythingOfType("string")).
+		Return([]byte("fake-frame-data"), nil).Times(2)
 
 	// Return 3 audio chunks
 	splitter.On("Split", mock.Anything, "/tmp/audio.wav", "/tmp", mock.Anything).

@@ -312,6 +312,59 @@ func TestJoinVideos(t *testing.T) {
 	})
 }
 
+func TestExtractLastFrame(t *testing.T) {
+	skipIfNoFFmpeg(t)
+
+	tmpDir := t.TempDir()
+	p := NewFFmpegProcessor("")
+	ctx := context.Background()
+
+	t.Run("extracts last frame from video", func(t *testing.T) {
+		// Create a test video (2 seconds, red color)
+		videoPath := filepath.Join(tmpDir, "test_video.mp4")
+		createTestVideo(t, videoPath, 2.0, "red")
+
+		frameData, err := p.ExtractLastFrame(ctx, videoPath)
+		if err != nil {
+			t.Fatalf("ExtractLastFrame failed: %v", err)
+		}
+
+		// Verify we got PNG data (PNG magic bytes: 0x89 0x50 0x4E 0x47)
+		if len(frameData) < 8 {
+			t.Fatalf("frame data too small: %d bytes", len(frameData))
+		}
+		if frameData[0] != 0x89 || frameData[1] != 0x50 || frameData[2] != 0x4E || frameData[3] != 0x47 {
+			t.Error("extracted frame is not a valid PNG")
+		}
+
+		// Verify temp file was cleaned up
+		tempFile := videoPath + "_last_frame.png"
+		if _, err := os.Stat(tempFile); !os.IsNotExist(err) {
+			t.Error("temporary frame file was not cleaned up")
+		}
+	})
+
+	t.Run("fails with non-existent video", func(t *testing.T) {
+		_, err := p.ExtractLastFrame(ctx, "/non/existent/video.mp4")
+		if err == nil {
+			t.Error("expected error for non-existent video")
+		}
+	})
+
+	t.Run("respects context cancellation", func(t *testing.T) {
+		videoPath := filepath.Join(tmpDir, "test_video_cancel.mp4")
+		createTestVideo(t, videoPath, 1.0, "blue")
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		_, err := p.ExtractLastFrame(ctx, videoPath)
+		if err == nil {
+			t.Error("expected error when context is cancelled")
+		}
+	})
+}
+
 func TestFFmpegError(t *testing.T) {
 	err := &FFmpegError{
 		Args:   []string{"-i", "input.mp4", "-c", "copy", "output.mp4"},
