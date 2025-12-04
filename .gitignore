@@ -44,3 +44,4 @@ infinitetalk-api
 infinitetalk-api
 server
 *__debug_*
+tmp/*
