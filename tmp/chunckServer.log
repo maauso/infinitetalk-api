@@ -1,0 +1,4 @@
+api-1  | {"time":"2025-12-03T19:20:38.772108306Z","level":"INFO","msg":"http request","method":"GET","path":"/jobs/job-1764789622-2371a300","status":200,"duration":45045,"remote_addr":"192.168.1.111:50394"}
+api-1  | {"time":"2025-12-03T19:20:45.062070741Z","level":"ERROR","msg":"failed to process chunks","job_id":"job-1764789622-2371a300","error":"chunk 6 failed: failed to poll RunPod: RunPod job failed: 비디오를 찾을 수 없습니다."}
+api-1  | {"time":"2025-12-03T19:20:45.062103541Z","level":"ERROR","msg":"job failed","job_id":"job-1764789622-2371a300","error":"chunk 6 failed: failed to poll RunPod: RunPod job failed: 비디오를 찾을 수 없습니다."}
+api-1  | {"time":"2025-12-03T19:20:56.304453508Z","level":"INFO","msg":"http request","method":"GET","path":"/jobs/job-1764789622-2371a300","status":200,"duration":56577,"remote_addr":"192.168.1.111:56740"}
