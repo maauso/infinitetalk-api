@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/maauso/infinitetalk-api/internal/audio"
@@ -70,8 +69,6 @@ type ProcessVideoService struct {
 	runpod    runpod.Client
 	storage   storage.Storage
 	logger    *slog.Logger
-	// maxConcurrentChunks limits parallel RunPod submissions.
-	maxConcurrentChunks int
 	// splitOpts configures audio splitting behavior.
 	splitOpts audio.SplitOpts
 	// pollInterval is the duration between RunPod status polls.
@@ -80,15 +77,6 @@ type ProcessVideoService struct {
 
 // ServiceOption is a function that configures a ProcessVideoService.
 type ServiceOption func(*ProcessVideoService)
-
-// WithMaxConcurrentChunks sets the maximum number of concurrent chunk processing.
-func WithMaxConcurrentChunks(n int) ServiceOption {
-	return func(s *ProcessVideoService) {
-		if n > 0 {
-			s.maxConcurrentChunks = n
-		}
-	}
-}
 
 // WithSplitOpts sets the audio splitting options.
 func WithSplitOpts(opts audio.SplitOpts) ServiceOption {
@@ -120,28 +108,19 @@ func NewProcessVideoService(
 		logger = slog.Default()
 	}
 	s := &ProcessVideoService{
-		repo:                repo,
-		processor:           processor,
-		splitter:            splitter,
-		runpod:              runpodClient,
-		storage:             storageClient,
-		logger:              logger,
-		maxConcurrentChunks: 3, // Default concurrency
-		splitOpts:           audio.DefaultSplitOpts(),
-		pollInterval:        5 * time.Second,
+		repo:         repo,
+		processor:    processor,
+		splitter:     splitter,
+		runpod:       runpodClient,
+		storage:      storageClient,
+		logger:       logger,
+		splitOpts:    audio.DefaultSplitOpts(),
+		pollInterval: 5 * time.Second,
 	}
 	for _, opt := range opts {
 		opt(s)
 	}
 	return s
-}
-
-// SetMaxConcurrentChunks configures the maximum number of chunks
-// that can be processed in parallel.
-func (s *ProcessVideoService) SetMaxConcurrentChunks(n int) {
-	if n > 0 {
-		s.maxConcurrentChunks = n
-	}
 }
 
 // CreateJob creates a new job and persists it to the repository.
@@ -356,8 +335,8 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 		}, nil
 	}
 
-	// Step 5: Process chunks in parallel with semaphore
-	videoPaths, err := s.processChunksParallel(ctx, job, resizedImageB64, audioChunks, input.Width, input.Height)
+	// Step 5: Process chunks sequentially with frame continuity
+	videoPaths, err := s.processChunksSequential(ctx, job, resizedImageB64, audioChunks, input.Width, input.Height)
 	if err != nil {
 		s.logger.Error("failed to process chunks",
 			slog.String("job_id", job.ID),
@@ -446,101 +425,70 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 	}, nil
 }
 
-// processChunksParallel processes audio chunks in parallel with limited concurrency.
-func (s *ProcessVideoService) processChunksParallel(
+// processChunksSequential processes audio chunks one by one, using the last
+// frame of each video as the input image for the next chunk to maintain
+// visual continuity.
+func (s *ProcessVideoService) processChunksSequential(
 	ctx context.Context,
 	job *Job,
-	imageB64 string,
+	initialImageB64 string,
 	audioChunks []string,
 	width, height int,
 ) ([]string, error) {
-	var (
-		mu         sync.Mutex
-		wg         sync.WaitGroup
-		sem        = make(chan struct{}, s.maxConcurrentChunks)
-		videoPaths = make([]string, len(audioChunks))
-		firstErr   error
-		errOnce    sync.Once
-	)
+	videoPaths := make([]string, 0, len(audioChunks))
+	currentImageB64 := initialImageB64
 
 	for i, chunkPath := range audioChunks {
+		// Check context before starting each chunk
 		select {
 		case <-ctx.Done():
 			return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
 		default:
 		}
 
-		// Check if there was an error from another goroutine
-		mu.Lock()
-		hasErr := firstErr != nil
-		mu.Unlock()
-		if hasErr {
-			break
+		s.logger.Info("processing chunk sequentially",
+			slog.String("job_id", job.ID),
+			slog.Int("chunk_index", i),
+			slog.Int("total_chunks", len(audioChunks)),
+		)
+
+		// Process this chunk
+		videoPath, err := s.processChunk(ctx, job, i, currentImageB64, chunkPath, width, height)
+		if err != nil {
+			return nil, fmt.Errorf("chunk %d failed: %w", i, err)
+		}
+		videoPaths = append(videoPaths, videoPath)
+
+		// Update progress
+		progress := ((i + 1) * 90) / len(audioChunks) // Reserve 10% for joining
+		job.UpdateProgress(progress)
+		if err := s.repo.Save(ctx, job); err != nil {
+			s.logger.Warn("failed to save job progress",
+				slog.String("job_id", job.ID),
+				slog.String("error", err.Error()),
+			)
 		}
 
-		wg.Add(1)
-		go func(idx int, audioPath string) {
-			defer wg.Done()
-
-			// Acquire semaphore
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-ctx.Done():
-				errOnce.Do(func() {
-					mu.Lock()
-					firstErr = ctx.Err()
-					mu.Unlock()
-				})
-				return
-			}
-
-			// Check again for errors
-			mu.Lock()
-			if firstErr != nil {
-				mu.Unlock()
-				return
-			}
-			mu.Unlock()
-
-			// Process the chunk
-			videoPath, err := s.processChunk(ctx, job, idx, imageB64, audioPath, width, height)
+		// Extract last frame for continuity (except for the last chunk)
+		if i < len(audioChunks)-1 {
+			frameBytes, err := s.processor.ExtractLastFrame(ctx, videoPath)
 			if err != nil {
-				errOnce.Do(func() {
-					mu.Lock()
-					firstErr = fmt.Errorf("chunk %d failed: %w", idx, err)
-					mu.Unlock()
-				})
-				return
-			}
-
-			mu.Lock()
-			videoPaths[idx] = videoPath
-			// Update progress
-			completedChunks := 0
-			for _, p := range videoPaths {
-				if p != "" {
-					completedChunks++
-				}
-			}
-			progress := (completedChunks * 90) / len(audioChunks) // Reserve 10% for joining
-			job.UpdateProgress(progress)
-			mu.Unlock()
-
-			// Save progress
-			if err := s.repo.Save(ctx, job); err != nil {
-				s.logger.Warn("failed to save job progress",
+				// Fallback: log warning but continue with previous image
+				s.logger.Warn("failed to extract last frame, using previous image",
 					slog.String("job_id", job.ID),
+					slog.Int("chunk_index", i),
 					slog.String("error", err.Error()),
 				)
+				// currentImageB64 stays the same (fallback)
+			} else {
+				currentImageB64 = base64.StdEncoding.EncodeToString(frameBytes)
+				s.logger.Debug("extracted last frame for continuity",
+					slog.String("job_id", job.ID),
+					slog.Int("chunk_index", i),
+					slog.Int("frame_size_bytes", len(frameBytes)),
+				)
 			}
-		}(i, chunkPath)
-	}
-
-	wg.Wait()
-
-	if firstErr != nil {
-		return nil, firstErr
+		}
 	}
 
 	return videoPaths, nil
