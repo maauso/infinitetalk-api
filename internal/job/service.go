@@ -689,9 +689,7 @@ func (s *ProcessVideoService) pollForResult(ctx context.Context, jobID string, c
 					slog.String("to", string(result.Status)),
 				)
 			}
-			if firstPoll {
-				firstPoll = false
-			}
+			firstPoll = false
 			prevStatus = result.Status
 
 			switch result.Status {
