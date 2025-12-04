@@ -262,6 +262,16 @@ func (j *Job) SetOutput(videoPath, videoURL string) {
 	j.UpdatedAt = time.Now()
 }
 
+// ClearOutput clears the output video path and URL.
+// This is used when deleting the job's video file.
+func (j *Job) ClearOutput() {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.OutputVideoPath = ""
+	j.VideoURL = ""
+	j.UpdatedAt = time.Now()
+}
+
 // IsTerminal returns true if the job is in a terminal state.
 func (j *Job) IsTerminal() bool {
 	j.mu.RLock()

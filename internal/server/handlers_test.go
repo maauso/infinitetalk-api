@@ -469,3 +469,91 @@ func TestCreateJob_DryRun(t *testing.T) {
 	assert.NotEmpty(t, resp.ID)
 	assert.Equal(t, "IN_QUEUE", resp.Status)
 }
+
+func TestDeleteJobVideo_Success(t *testing.T) {
+	h, _, _, _, _, repo := newTestHandlers(t)
+	ctx := context.Background()
+
+	// Create a temp video file
+	videoPath := "/tmp/test_handler_delete_video.mp4"
+	err := os.WriteFile(videoPath, []byte("video data"), 0644)
+	require.NoError(t, err)
+	defer os.Remove(videoPath)
+
+	// Create a job with the video path
+	testJob := job.New()
+	testJob.SetOutput(videoPath, "")
+	err = repo.Save(ctx, testJob)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs/"+testJob.ID+"/video/delete", nil)
+	req.SetPathValue("id", testJob.ID)
+	rec := httptest.NewRecorder()
+
+	h.DeleteJobVideo(rec, req)
+
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+
+	// Verify file was deleted
+	_, statErr := os.Stat(videoPath)
+	assert.True(t, os.IsNotExist(statErr))
+
+	// Verify job output was cleared
+	updatedJob, err := repo.FindByID(ctx, testJob.ID)
+	require.NoError(t, err)
+	assert.Empty(t, updatedJob.OutputVideoPath)
+}
+
+func TestDeleteJobVideo_FileAlreadyMissing(t *testing.T) {
+	h, _, _, _, _, repo := newTestHandlers(t)
+	ctx := context.Background()
+
+	// Create a job with a non-existent video path
+	testJob := job.New()
+	testJob.SetOutput("/tmp/nonexistent_handler_video.mp4", "")
+	err := repo.Save(ctx, testJob)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs/"+testJob.ID+"/video/delete", nil)
+	req.SetPathValue("id", testJob.ID)
+	rec := httptest.NewRecorder()
+
+	h.DeleteJobVideo(rec, req)
+
+	// Should still return 204 (idempotent)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+}
+
+func TestDeleteJobVideo_JobNotFound(t *testing.T) {
+	h, _, _, _, _, _ := newTestHandlers(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs/nonexistent/video/delete", nil)
+	req.SetPathValue("id", "nonexistent")
+	rec := httptest.NewRecorder()
+
+	h.DeleteJobVideo(rec, req)
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+
+	var resp ErrorResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "JOB_NOT_FOUND", resp.Code)
+}
+
+func TestDeleteJobVideo_MissingID(t *testing.T) {
+	h, _, _, _, _, _ := newTestHandlers(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs//video/delete", nil)
+	// Don't set path value to simulate missing ID
+	rec := httptest.NewRecorder()
+
+	h.DeleteJobVideo(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+	var resp ErrorResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "MISSING_JOB_ID", resp.Code)
+}

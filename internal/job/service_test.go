@@ -969,3 +969,100 @@ func TestProcessVideoService_Process_DryRun(t *testing.T) {
 	// Cleanup temp file created by test
 	os.Remove("/tmp/image.png")
 }
+
+func TestProcessVideoService_DeleteJobVideo_Success(t *testing.T) {
+	svc, _, _, _, _, repo := newTestService(t)
+	ctx := context.Background()
+
+	// Create a temp video file
+	videoPath := "/tmp/test_delete_video.mp4"
+	if err := os.WriteFile(videoPath, []byte("video data"), 0644); err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(videoPath)
+
+	// Create a job with the video path
+	job := New()
+	job.SetOutput(videoPath, "")
+	if err := repo.Save(ctx, job); err != nil {
+		t.Fatalf("failed to save job: %v", err)
+	}
+
+	// Delete the video
+	err := svc.DeleteJobVideo(ctx, job.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify file was deleted
+	if _, err := os.Stat(videoPath); !os.IsNotExist(err) {
+		t.Error("expected video file to be deleted")
+	}
+
+	// Verify job output was cleared
+	updatedJob, err := repo.FindByID(ctx, job.ID)
+	if err != nil {
+		t.Fatalf("failed to find job: %v", err)
+	}
+	if updatedJob.OutputVideoPath != "" {
+		t.Errorf("expected OutputVideoPath to be empty, got %s", updatedJob.OutputVideoPath)
+	}
+	if updatedJob.VideoURL != "" {
+		t.Errorf("expected VideoURL to be empty, got %s", updatedJob.VideoURL)
+	}
+}
+
+func TestProcessVideoService_DeleteJobVideo_FileAlreadyMissing(t *testing.T) {
+	svc, _, _, _, _, repo := newTestService(t)
+	ctx := context.Background()
+
+	// Create a job with a non-existent video path
+	job := New()
+	job.SetOutput("/tmp/nonexistent_video_12345.mp4", "")
+	if err := repo.Save(ctx, job); err != nil {
+		t.Fatalf("failed to save job: %v", err)
+	}
+
+	// Delete should succeed even if file is missing (idempotent)
+	err := svc.DeleteJobVideo(ctx, job.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify job output was cleared
+	updatedJob, err := repo.FindByID(ctx, job.ID)
+	if err != nil {
+		t.Fatalf("failed to find job: %v", err)
+	}
+	if updatedJob.OutputVideoPath != "" {
+		t.Errorf("expected OutputVideoPath to be empty, got %s", updatedJob.OutputVideoPath)
+	}
+}
+
+func TestProcessVideoService_DeleteJobVideo_NoOutputPath(t *testing.T) {
+	svc, _, _, _, _, repo := newTestService(t)
+	ctx := context.Background()
+
+	// Create a job without an output path
+	job := New()
+	if err := repo.Save(ctx, job); err != nil {
+		t.Fatalf("failed to save job: %v", err)
+	}
+
+	// Delete should succeed
+	err := svc.DeleteJobVideo(ctx, job.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProcessVideoService_DeleteJobVideo_JobNotFound(t *testing.T) {
+	svc, _, _, _, _, _ := newTestService(t)
+	ctx := context.Background()
+
+	// Delete a non-existent job
+	err := svc.DeleteJobVideo(ctx, "nonexistent")
+	if !errors.Is(err, ErrJobNotFound) {
+		t.Errorf("expected ErrJobNotFound, got %v", err)
+	}
+}

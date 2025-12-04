@@ -284,6 +284,24 @@ func TestJob_SetOutput(t *testing.T) {
 	}
 }
 
+func TestJob_ClearOutput(t *testing.T) {
+	job := New()
+	job.SetOutput("/tmp/video.mp4", "https://s3.example.com/video.mp4")
+
+	beforeClear := time.Now()
+	job.ClearOutput()
+
+	if job.OutputVideoPath != "" {
+		t.Errorf("expected OutputVideoPath to be empty, got %s", job.OutputVideoPath)
+	}
+	if job.VideoURL != "" {
+		t.Errorf("expected VideoURL to be empty, got %s", job.VideoURL)
+	}
+	if job.UpdatedAt.Before(beforeClear) {
+		t.Error("expected UpdatedAt to be updated after ClearOutput")
+	}
+}
+
 func TestJob_Clone(t *testing.T) {
 	job := New()
 	job.Status = StatusRunning
