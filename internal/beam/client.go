@@ -190,7 +190,7 @@ func (c *HTTPClient) Poll(ctx context.Context, taskID string) (PollResult, error
 	}
 
 	switch result.Status {
-	case StatusCompleted, StatusComplete:
+	case StatusCompleted:
 		// Extract output URL
 		if len(resp.Outputs) > 0 && resp.Outputs[0].URL != "" {
 			result.OutputURL = resp.Outputs[0].URL
