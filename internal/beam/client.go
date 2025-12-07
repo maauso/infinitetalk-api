@@ -32,6 +32,8 @@ var (
 	ErrRequestFailed = errors.New("beam: request failed")
 	// ErrNoOutputURL is returned when a completed task has no output URL.
 	ErrNoOutputURL = errors.New("beam: no output URL in completed task")
+	// ErrDownloadFailed is returned when downloading output fails.
+	ErrDownloadFailed = errors.New("beam: download failed")
 )
 
 // Client defines the interface for interacting with the Beam Task Queue API.
@@ -219,17 +221,28 @@ func (c *HTTPClient) DownloadOutput(ctx context.Context, outputURL, destPath str
 	if err != nil {
 		return fmt.Errorf("beam: download request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Log error but don't override the main return error
+			_ = closeErr
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("beam: download failed with status %d", resp.StatusCode)
+		return fmt.Errorf("%w: status %d", ErrDownloadFailed, resp.StatusCode)
 	}
 
+	// #nosec G304 - destPath is controlled by the application, not user input
 	out, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("beam: create output file: %w", err)
 	}
-	defer out.Close()
+	defer func() {
+		if closeErr := out.Close(); closeErr != nil {
+			// Log error but don't override the main return error
+			_ = closeErr
+		}
+	}()
 
 	if _, err := io.Copy(out, resp.Body); err != nil {
 		return fmt.Errorf("beam: copy download data: %w", err)

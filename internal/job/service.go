@@ -27,6 +27,8 @@ var (
 	ErrRunPodJobCancelled = errors.New("RunPod job cancelled")
 	// ErrRunPodJobTimedOut is returned when a RunPod job times out.
 	ErrRunPodJobTimedOut = errors.New("RunPod job timed out")
+	// ErrInvalidProvider is returned when an invalid provider is specified.
+	ErrInvalidProvider = errors.New("invalid provider")
 )
 
 // ProcessVideoInput contains the input parameters for video processing.
@@ -146,7 +148,7 @@ func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoI
 
 	// Validate provider
 	if !job.Provider.IsValid() {
-		return nil, fmt.Errorf("invalid provider: %s", input.Provider)
+		return nil, fmt.Errorf("%w: %s", ErrInvalidProvider, input.Provider)
 	}
 
 	s.logger.Info("creating new job",

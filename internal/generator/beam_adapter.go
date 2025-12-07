@@ -2,6 +2,7 @@ package generator
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/maauso/infinitetalk-api/internal/beam"
 )
@@ -24,14 +25,18 @@ func (a *BeamAdapter) Submit(ctx context.Context, imageB64, audioB64 string, opt
 		Height:       opts.Height,
 		ForceOffload: opts.ForceOffload,
 	}
-	return a.client.Submit(ctx, imageB64, audioB64, beamOpts)
+	taskID, err := a.client.Submit(ctx, imageB64, audioB64, beamOpts)
+	if err != nil {
+		return "", fmt.Errorf("beam adapter submit: %w", err)
+	}
+	return taskID, nil
 }
 
 // Poll checks the status of a Beam task.
 func (a *BeamAdapter) Poll(ctx context.Context, taskID string) (PollResult, error) {
 	result, err := a.client.Poll(ctx, taskID)
 	if err != nil {
-		return PollResult{}, err
+		return PollResult{}, fmt.Errorf("beam adapter poll: %w", err)
 	}
 
 	// Map Beam status to common status
@@ -60,7 +65,10 @@ func (a *BeamAdapter) Poll(ctx context.Context, taskID string) (PollResult, erro
 
 // DownloadOutput downloads the video from the Beam output URL.
 func (a *BeamAdapter) DownloadOutput(ctx context.Context, outputURL, destPath string) error {
-	return a.client.DownloadOutput(ctx, outputURL, destPath)
+	if err := a.client.DownloadOutput(ctx, outputURL, destPath); err != nil {
+		return fmt.Errorf("beam adapter download: %w", err)
+	}
+	return nil
 }
 
 // Compile-time check that BeamAdapter implements Generator.

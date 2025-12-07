@@ -2,6 +2,7 @@ package generator
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/maauso/infinitetalk-api/internal/runpod"
 )
@@ -24,14 +25,18 @@ func (a *RunPodAdapter) Submit(ctx context.Context, imageB64, audioB64 string, o
 		Height: opts.Height,
 		// RunPod doesn't use ForceOffload
 	}
-	return a.client.Submit(ctx, imageB64, audioB64, runpodOpts)
+	jobID, err := a.client.Submit(ctx, imageB64, audioB64, runpodOpts)
+	if err != nil {
+		return "", fmt.Errorf("runpod adapter submit: %w", err)
+	}
+	return jobID, nil
 }
 
 // Poll checks the status of a RunPod job.
 func (a *RunPodAdapter) Poll(ctx context.Context, jobID string) (PollResult, error) {
 	result, err := a.client.Poll(ctx, jobID)
 	if err != nil {
-		return PollResult{}, err
+		return PollResult{}, fmt.Errorf("runpod adapter poll: %w", err)
 	}
 
 	// Map RunPod status to common status
