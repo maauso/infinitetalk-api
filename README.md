@@ -1,10 +1,10 @@
 # Infinitetalk API
 
-> REST API for lip-sync video generation powered by RunPod.
+> REST API for lip-sync video generation powered by RunPod and Beam.
 
 ```
 ┌──────────────────┐      ┌───────────────────┐      ┌───────────────────┐
-│ Client (browser) │ ───▶ │  Infinitetalk API │ ───▶ │   RunPod Worker   │
+│ Client (browser) │ ───▶ │  Infinitetalk API │ ───▶ │ RunPod / Beam     │
 └──────────────────┘      └───────────────────┘      └───────────────────┘
                                    │   ▲
                                    ▼   │
@@ -14,7 +14,7 @@
                           └─────────────────────┘
 ```
 
-Infinitetalk is a lightweight REST API that creates lip-synced videos. It accepts an image and a WAV audio file, splits the audio into chunks at silence boundaries, submits chunks in parallel to a RunPod worker, stitches the partial videos with `ffmpeg`, and returns or uploads the final video.
+Infinitetalk is a lightweight REST API that creates lip-synced videos. It accepts an image and a WAV audio file, splits the audio into chunks at silence boundaries, submits chunks to a RunPod or Beam worker, stitches the partial videos with `ffmpeg`, and returns or uploads the final video.
 
 ## Features
 
@@ -35,6 +35,10 @@ Infinitetalk is a lightweight REST API that creates lip-synced videos. It accept
 | `PORT` | No | `8080` | HTTP server port |
 | `RUNPOD_API_KEY` | **Yes** | — | RunPod API key |
 | `RUNPOD_ENDPOINT_ID` | **Yes** | — | RunPod endpoint ID |
+| `BEAM_TOKEN` | No | — | Beam.cloud API token (optional) |
+| `BEAM_QUEUE_URL` | No | — | Beam task queue webhook URL (optional) |
+| `BEAM_POLL_INTERVAL_MS` | No | `5000` | Beam status poll interval (ms) |
+| `BEAM_POLL_TIMEOUT_SEC` | No | `600` | Beam task timeout (seconds) |
 | `TEMP_DIR` | No | `/tmp/infinitetalk` | Directory for temporary files |
 | `MAX_CONCURRENT_CHUNKS` | No | `3` | Max parallel RunPod submissions |
 | `CHUNK_TARGET_SEC` | No | `45` | Target chunk duration (seconds) |
@@ -72,6 +76,8 @@ go test ./...
 
 ### Create a Job
 
+#### Using RunPod (default)
+
 ```bash
 curl -X POST http://localhost:8080/jobs \
   -H "Content-Type: application/json" \
@@ -80,10 +86,31 @@ curl -X POST http://localhost:8080/jobs \
     "audio_base64": "<base64-encoded-wav>",
     "width": 384,
     "height": 576,
+    "provider": "runpod",
     "push_to_s3": false,
     "dry_run": false
   }'
 ```
+
+#### Using Beam
+
+```bash
+curl -X POST http://localhost:8080/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image_base64": "<base64-encoded-image>",
+    "audio_base64": "<base64-encoded-wav>",
+    "width": 384,
+    "height": 540,
+    "provider": "beam",
+    "push_to_s3": false,
+    "dry_run": false
+  }'
+```
+
+**Note:** The `provider` field is optional and defaults to `"runpod"`. Valid values are `"runpod"` or `"beam"`.
+
+**Note:** Beam integration is currently configured at the API level but full orchestration support in `ProcessVideoService` is pending. Jobs with `provider: "beam"` will be rejected with a helpful error message.
 
 Response (`202 Accepted`):
 
@@ -94,7 +121,7 @@ Response (`202 Accepted`):
 }
 ```
 
-**Dry-Run Mode:** Set `"dry_run": true` to execute preprocessing (decode, resize, split) without calling RunPod. Useful for testing and validation. The job completes immediately after audio splitting.
+**Dry-Run Mode:** Set `"dry_run": true` to execute preprocessing (decode, resize, split) without calling the provider. Useful for testing and validation. The job completes immediately after audio splitting.
 
 ### Poll Job Status
 
@@ -107,6 +134,7 @@ Response when completed:
 ```json
 {
   "id": "job-1234567890-abc12345",
+  "provider": "runpod",
   "status": "COMPLETED",
   "progress": 100,
   "video_base64": "<base64-encoded-mp4>"
@@ -204,15 +232,31 @@ This ensures that RunPod/ComfyUI can decode audio without "Invalid data found wh
 
 ```
 internal/
-├── audio/     # Silence-based audio splitting
-├── job/       # Domain, repository, use cases
-├── media/     # Video/image operations (ffmpeg)
-├── runpod/    # RunPod HTTP client
-├── server/    # HTTP handlers and middlewares
-└── storage/   # Temp storage and S3
+├── audio/      # Silence-based audio splitting
+├── beam/       # Beam.cloud HTTP client
+├── generator/  # Common interface for video generation providers
+├── job/        # Domain, repository, use cases
+├── media/      # Video/image operations (ffmpeg)
+├── runpod/     # RunPod HTTP client
+├── server/     # HTTP handlers and middlewares
+└── storage/    # Temp storage and S3
 api/
 └── openapi.yaml   # OpenAPI 3.0 specification
 ```
+
+## Provider Support
+
+### RunPod
+- **Status:** ✅ Fully supported
+- **Configuration:** `RUNPOD_API_KEY`, `RUNPOD_ENDPOINT_ID`
+- **Features:** Parallel chunk processing, base64 video response
+
+### Beam
+- **Status:** 🚧 Partially implemented
+- **Configuration:** `BEAM_TOKEN`, `BEAM_QUEUE_URL`
+- **Implementation:** Client, API types, and Generator adapter are complete
+- **Pending:** Full orchestration integration in `ProcessVideoService`
+- **Current Behavior:** Jobs with `provider: "beam"` will return an error indicating the feature is not yet fully integrated
 
 ## License
 

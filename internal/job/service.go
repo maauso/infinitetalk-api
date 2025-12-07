@@ -212,6 +212,16 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 
 // processJob executes the video processing workflow for the given job.
 func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input ProcessVideoInput) (*ProcessVideoOutput, error) {
+	// Check if Beam provider is requested
+	if job.Provider == ProviderBeam {
+		errMsg := "Beam provider is not yet fully integrated in ProcessVideoService orchestration"
+		s.logger.Error(errMsg,
+			slog.String("job_id", job.ID),
+			slog.String("provider", string(job.Provider)),
+		)
+		return s.failJob(ctx, job, errMsg)
+	}
+
 	// Track temporary files for cleanup
 	var tempFiles []string
 	defer func() { //nolint:contextcheck // Using context.Background() intentionally for cleanup
@@ -240,6 +250,7 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 
 	s.logger.Info("job started, processing video",
 		slog.String("job_id", job.ID),
+		slog.String("provider", string(job.Provider)),
 	)
 
 	// Step 1: Decode and save input image
