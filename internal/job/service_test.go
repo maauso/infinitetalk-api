@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/maauso/infinitetalk-api/internal/audio"
+	"github.com/maauso/infinitetalk-api/internal/generator"
 	"github.com/maauso/infinitetalk-api/internal/runpod"
 	"github.com/stretchr/testify/mock"
 )
@@ -107,7 +108,7 @@ func newTestService(t *testing.T) (*ProcessVideoService, *mockProcessor, *mockSp
 	storageClient := &mockStorage{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, logger,
+	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, nil, storageClient, logger,
 		WithPollInterval(10*time.Millisecond),
 	)
 
@@ -122,7 +123,7 @@ func TestNewProcessVideoService(t *testing.T) {
 	storageClient := &mockStorage{}
 
 	// With nil logger
-	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, nil)
+	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, nil, storageClient, nil)
 	if svc == nil {
 		t.Fatal("expected non-nil service")
 	}
@@ -132,7 +133,7 @@ func TestNewProcessVideoService(t *testing.T) {
 
 	// With custom logger
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	svc2 := NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, logger)
+	svc2 := NewProcessVideoService(repo, processor, splitter, runpodClient, nil, storageClient, logger)
 	if svc2.logger != logger {
 		t.Error("expected custom logger to be set")
 	}
@@ -145,7 +146,7 @@ func TestNewProcessVideoService_WithOptions(t *testing.T) {
 	runpodClient := &mockRunpodClient{}
 	storageClient := &mockStorage{}
 
-	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, nil,
+	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, nil, storageClient, nil,
 		WithSplitOpts(audio.SplitOpts{ChunkTargetSec: 30}),
 		WithPollInterval(10*time.Second),
 	)
@@ -817,11 +818,14 @@ func TestProcessVideoService_Process_InvalidBase64Image(t *testing.T) {
 	}
 }
 
-func TestProcessVideoService_pollForResult_PollingWithRetry(t *testing.T) {
+func TestProcessVideoService_pollForResultWithGenerator_PollingWithRetry(t *testing.T) {
 	svc, _, _, runpodClient, _, _ := newTestService(t)
 	ctx := context.Background()
 
 	videoB64 := base64.StdEncoding.EncodeToString([]byte("video-data"))
+
+	// Create a generator adapter
+	gen := generator.NewRunPodAdapter(runpodClient)
 
 	// First call returns IN_QUEUE, second returns RUNNING, third returns COMPLETED
 	runpodClient.On("Poll", mock.Anything, "job-123").
@@ -831,13 +835,16 @@ func TestProcessVideoService_pollForResult_PollingWithRetry(t *testing.T) {
 	runpodClient.On("Poll", mock.Anything, "job-123").
 		Return(runpod.PollResult{Status: runpod.StatusCompleted, VideoBase64: videoB64}, nil).Once()
 
-	result, err := svc.pollForResult(ctx, "test-job", 0, "job-123")
+	result, err := svc.pollForResultWithGenerator(ctx, gen, "test-job", 0, "job-123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result != videoB64 {
+	if result.VideoBase64 != videoB64 {
 		t.Error("expected video base64 in result")
+	}
+	if result.Status != generator.StatusCompleted {
+		t.Errorf("expected status COMPLETED, got %s", result.Status)
 	}
 
 	runpodClient.AssertExpectations(t)
