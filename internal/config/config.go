@@ -29,6 +29,12 @@ type Config struct {
 	RunPodAPIKey     string `env:"RUNPOD_API_KEY, required" json:"-"` // Masked in JSON
 	RunPodEndpointID string `env:"RUNPOD_ENDPOINT_ID, required" json:"runpod_endpoint_id"`
 
+	// Beam settings (optional)
+	BeamToken          string `env:"BEAM_TOKEN" json:"-"`                               // Masked in JSON
+	BeamQueueURL       string `env:"BEAM_QUEUE_URL" json:"beam_queue_url,omitempty"`   // Task queue webhook URL
+	BeamPollIntervalMs int    `env:"BEAM_POLL_INTERVAL_MS, default=5000" json:"beam_poll_interval_ms"` // Default 5s
+	BeamPollTimeoutSec int    `env:"BEAM_POLL_TIMEOUT_SEC, default=600" json:"beam_poll_timeout_sec"`  // Default 10min
+
 	// Storage settings
 	TempDir string `env:"TEMP_DIR, default=/tmp/infinitetalk" json:"temp_dir"`
 
@@ -49,6 +55,11 @@ type Config struct {
 // S3Enabled returns true if S3 configuration is provided.
 func (c *Config) S3Enabled() bool {
 	return c.S3Bucket != "" && c.S3Region != ""
+}
+
+// BeamEnabled returns true if Beam configuration is provided.
+func (c *Config) BeamEnabled() bool {
+	return c.BeamToken != "" && c.BeamQueueURL != ""
 }
 
 // Load reads configuration from environment variables using go-envconfig.
@@ -104,9 +115,10 @@ func (c *Config) NewLogger() *slog.Logger {
 // String returns a string representation of the config with sensitive values masked.
 func (c *Config) String() string {
 	return fmt.Sprintf(
-		"Config{Port: %d, RunPodEndpointID: %s, TempDir: %s, ChunkTargetSec: %d, S3Bucket: %s, S3Region: %s, LogFormat: %s, LogLevel: %s}",
+		"Config{Port: %d, RunPodEndpointID: %s, BeamQueueURL: %s, TempDir: %s, ChunkTargetSec: %d, S3Bucket: %s, S3Region: %s, LogFormat: %s, LogLevel: %s}",
 		c.Port,
 		c.RunPodEndpointID,
+		c.BeamQueueURL,
 		c.TempDir,
 		c.ChunkTargetSec,
 		c.S3Bucket,

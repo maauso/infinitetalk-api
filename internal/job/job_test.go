@@ -11,6 +11,9 @@ func TestNew(t *testing.T) {
 	if job.ID == "" {
 		t.Error("expected job to have an ID")
 	}
+	if job.Provider != ProviderRunPod {
+		t.Errorf("expected provider %s, got %s", ProviderRunPod, job.Provider)
+	}
 	if job.Status != StatusInQueue {
 		t.Errorf("expected status %s, got %s", StatusInQueue, job.Status)
 	}
@@ -22,6 +25,27 @@ func TestNew(t *testing.T) {
 	}
 	if job.Chunks == nil {
 		t.Error("expected Chunks to be initialized")
+	}
+}
+
+func TestProvider_IsValid(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider Provider
+		want     bool
+	}{
+		{"runpod valid", ProviderRunPod, true},
+		{"beam valid", ProviderBeam, true},
+		{"invalid empty", Provider(""), false},
+		{"invalid unknown", Provider("unknown"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.provider.IsValid(); got != tt.want {
+				t.Errorf("Provider.IsValid() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

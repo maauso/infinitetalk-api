@@ -132,6 +132,58 @@ func TestConfig_S3Enabled(t *testing.T) {
 	}
 }
 
+func TestConfig_BeamEnabled(t *testing.T) {
+	tests := []struct {
+		name     string
+		token    string
+		queueURL string
+		expected bool
+	}{
+		{"both set", "token", "https://api.beam.cloud/v1/task_queue/123/tasks", true},
+		{"only token", "token", "", false},
+		{"only queue URL", "", "https://api.beam.cloud/v1/task_queue/123/tasks", false},
+		{"neither set", "", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				BeamToken:    tt.token,
+				BeamQueueURL: tt.queueURL,
+			}
+			assert.Equal(t, tt.expected, cfg.BeamEnabled())
+		})
+	}
+}
+
+func TestLoad_BeamDefaults(t *testing.T) {
+	t.Setenv("RUNPOD_API_KEY", "test-api-key")
+	t.Setenv("RUNPOD_ENDPOINT_ID", "test-endpoint")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, 5000, cfg.BeamPollIntervalMs)
+	assert.Equal(t, 600, cfg.BeamPollTimeoutSec)
+}
+
+func TestLoad_BeamCustomValues(t *testing.T) {
+	t.Setenv("RUNPOD_API_KEY", "test-api-key")
+	t.Setenv("RUNPOD_ENDPOINT_ID", "test-endpoint")
+	t.Setenv("BEAM_TOKEN", "beam-token")
+	t.Setenv("BEAM_QUEUE_URL", "https://api.beam.cloud/v1/task_queue/123/tasks")
+	t.Setenv("BEAM_POLL_INTERVAL_MS", "3000")
+	t.Setenv("BEAM_POLL_TIMEOUT_SEC", "300")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, "beam-token", cfg.BeamToken)
+	assert.Equal(t, "https://api.beam.cloud/v1/task_queue/123/tasks", cfg.BeamQueueURL)
+	assert.Equal(t, 3000, cfg.BeamPollIntervalMs)
+	assert.Equal(t, 300, cfg.BeamPollTimeoutSec)
+}
+
 func TestConfig_String(t *testing.T) {
 	cfg := &Config{
 		Port:             8080,

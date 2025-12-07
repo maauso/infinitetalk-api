@@ -11,6 +11,21 @@ import (
 	"github.com/maauso/infinitetalk-api/internal/job/id"
 )
 
+// Provider represents the video generation provider for the job.
+type Provider string
+
+const (
+	// ProviderRunPod uses RunPod for video generation.
+	ProviderRunPod Provider = "runpod"
+	// ProviderBeam uses Beam for video generation.
+	ProviderBeam Provider = "beam"
+)
+
+// IsValid returns true if the provider is valid.
+func (p Provider) IsValid() bool {
+	return p == ProviderRunPod || p == ProviderBeam
+}
+
 // Status represents the current state of a Job.
 // States are aligned with RunPod job states.
 type Status string
@@ -100,6 +115,8 @@ type Job struct {
 
 	// ID is the unique identifier for this job.
 	ID string
+	// Provider is the video generation provider (runpod or beam).
+	Provider Provider
 	// Status is the current job state.
 	Status Status
 	// Chunks contains the audio/video segments being processed.
@@ -133,10 +150,12 @@ type Job struct {
 }
 
 // New creates a new Job with a generated ID and initial IN_QUEUE status.
+// Provider defaults to RunPod.
 func New() *Job {
 	now := time.Now()
 	return &Job{
 		ID:        id.Generate(),
+		Provider:  ProviderRunPod,
 		Status:    StatusInQueue,
 		Chunks:    make([]Chunk, 0),
 		CreatedAt: now,
@@ -146,10 +165,12 @@ func New() *Job {
 
 // NewWithID creates a new Job with the specified ID and initial IN_QUEUE status.
 // Useful for testing or when ID needs to be externally generated.
+// Provider defaults to RunPod.
 func NewWithID(jobID string) *Job {
 	now := time.Now()
 	return &Job{
 		ID:        jobID,
+		Provider:  ProviderRunPod,
 		Status:    StatusInQueue,
 		Chunks:    make([]Chunk, 0),
 		CreatedAt: now,
@@ -292,6 +313,7 @@ func (j *Job) Clone() *Job {
 
 	return &Job{
 		ID:              j.ID,
+		Provider:        j.Provider,
 		Status:          j.Status,
 		Chunks:          chunks,
 		Progress:        j.Progress,
