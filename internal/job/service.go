@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/maauso/infinitetalk-api/internal/audio"
+	"github.com/maauso/infinitetalk-api/internal/beam"
+	"github.com/maauso/infinitetalk-api/internal/generator"
 	"github.com/maauso/infinitetalk-api/internal/media"
 	"github.com/maauso/infinitetalk-api/internal/runpod"
 	"github.com/maauso/infinitetalk-api/internal/storage"
@@ -67,12 +69,13 @@ type ProcessVideoOutput struct {
 // It coordinates between media processing, audio splitting, RunPod integration,
 // and storage to produce a lip-sync video.
 type ProcessVideoService struct {
-	repo      Repository
-	processor media.Processor
-	splitter  audio.Splitter
-	runpod    runpod.Client
-	storage   storage.Storage
-	logger    *slog.Logger
+	repo       Repository
+	processor  media.Processor
+	splitter   audio.Splitter
+	runpod     runpod.Client
+	beamClient beam.Client
+	storage    storage.Storage
+	logger     *slog.Logger
 	// splitOpts configures audio splitting behavior.
 	splitOpts audio.SplitOpts
 	// pollInterval is the duration between RunPod status polls.
@@ -104,6 +107,7 @@ func NewProcessVideoService(
 	processor media.Processor,
 	splitter audio.Splitter,
 	runpodClient runpod.Client,
+	beamClient beam.Client,
 	storageClient storage.Storage,
 	logger *slog.Logger,
 	opts ...ServiceOption,
@@ -116,6 +120,7 @@ func NewProcessVideoService(
 		processor:    processor,
 		splitter:     splitter,
 		runpod:       runpodClient,
+		beamClient:   beamClient,
 		storage:      storageClient,
 		logger:       logger,
 		splitOpts:    audio.DefaultSplitOpts(),
@@ -125,6 +130,21 @@ func NewProcessVideoService(
 		opt(s)
 	}
 	return s
+}
+
+// getGenerator returns the appropriate generator based on the provider.
+func (s *ProcessVideoService) getGenerator(provider Provider) (generator.Generator, error) {
+	switch provider {
+	case ProviderRunPod:
+		return generator.NewRunPodAdapter(s.runpod), nil
+	case ProviderBeam:
+		if s.beamClient == nil {
+			return nil, fmt.Errorf("Beam client not initialized")
+		}
+		return generator.NewBeamAdapter(s.beamClient), nil
+	default:
+		return nil, fmt.Errorf("%w: %s", ErrInvalidProvider, provider)
+	}
 }
 
 // CreateJob creates a new job and persists it to the repository.
@@ -214,14 +234,10 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 
 // processJob executes the video processing workflow for the given job.
 func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input ProcessVideoInput) (*ProcessVideoOutput, error) {
-	// Check if Beam provider is requested
-	if job.Provider == ProviderBeam {
-		errMsg := "Beam provider is not yet fully integrated in ProcessVideoService orchestration"
-		s.logger.Error(errMsg,
-			slog.String("job_id", job.ID),
-			slog.String("provider", string(job.Provider)),
-		)
-		return s.failJob(ctx, job, errMsg)
+	// Get appropriate generator for the provider
+	gen, err := s.getGenerator(job.Provider)
+	if err != nil {
+		return s.failJob(ctx, job, err.Error())
 	}
 
 	// Track temporary files for cleanup
@@ -344,10 +360,11 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 		return nil, fmt.Errorf("save job: %w", err)
 	}
 
-	// Dry-run mode: skip RunPod processing and complete immediately
+	// Dry-run mode: skip provider processing and complete immediately
 	if input.DryRun {
-		s.logger.Info("dry-run mode: skipping RunPod processing",
+		s.logger.Info("dry-run mode: skipping provider processing",
 			slog.String("job_id", job.ID),
+			slog.String("provider", string(job.Provider)),
 			slog.Int("chunk_count", len(audioChunks)),
 		)
 		job.UpdateProgress(100)
@@ -364,7 +381,7 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 	}
 
 	// Step 5: Process chunks sequentially with frame continuity
-	videoPaths, err := s.processChunksSequential(ctx, job, resizedImageB64, audioChunks, input.Width, input.Height)
+	videoPaths, err := s.processChunksSequential(ctx, job, gen, resizedImageB64, audioChunks, input.Width, input.Height)
 	if err != nil {
 		s.logger.Error("failed to process chunks",
 			slog.String("job_id", job.ID),
@@ -459,6 +476,7 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 func (s *ProcessVideoService) processChunksSequential(
 	ctx context.Context,
 	job *Job,
+	gen generator.Generator,
 	initialImageB64 string,
 	audioChunks []string,
 	width, height int,
@@ -481,7 +499,7 @@ func (s *ProcessVideoService) processChunksSequential(
 		)
 
 		// Process this chunk
-		videoPath, err := s.processChunk(ctx, job, i, currentImageB64, chunkPath, width, height)
+		videoPath, err := s.processChunkWithGenerator(ctx, job, gen, i, currentImageB64, chunkPath, width, height)
 		if err != nil {
 			return nil, fmt.Errorf("chunk %d failed: %w", i, err)
 		}
@@ -522,10 +540,11 @@ func (s *ProcessVideoService) processChunksSequential(
 	return videoPaths, nil
 }
 
-// processChunk processes a single audio chunk through RunPod.
-func (s *ProcessVideoService) processChunk(
+// processChunkWithGenerator processes a single audio chunk using a generator interface.
+func (s *ProcessVideoService) processChunkWithGenerator(
 	ctx context.Context,
 	job *Job,
+	gen generator.Generator,
 	idx int,
 	imageB64, audioPath string,
 	width, height int,
@@ -535,6 +554,7 @@ func (s *ProcessVideoService) processChunk(
 
 	s.logger.Info("processing chunk",
 		slog.String("job_id", job.ID),
+		slog.String("provider", string(job.Provider)),
 		slog.Int("chunk_index", idx),
 	)
 
@@ -545,50 +565,67 @@ func (s *ProcessVideoService) processChunk(
 		return "", fmt.Errorf("failed to encode audio: %w", err)
 	}
 
-	// Submit to RunPod
-	opts := runpod.SubmitOptions{
-		Width:  width,
-		Height: height,
+	// Submit using generator interface
+	submitOpts := generator.SubmitOptions{
+		Prompt:       "", // Use default prompt from provider
+		Width:        width,
+		Height:       height,
+		ForceOffload: true, // Default for Beam, ignored by RunPod
 	}
-	runpodJobID, err := s.runpod.Submit(ctx, imageB64, audioB64, opts)
+	providerJobID, err := gen.Submit(ctx, imageB64, audioB64, submitOpts)
 	if err != nil {
 		s.updateChunkStatus(job, idx, ChunkStatusFailed, err.Error())
-		return "", fmt.Errorf("failed to submit to RunPod: %w", err)
+		return "", fmt.Errorf("failed to submit to provider: %w", err)
 	}
 
-	// Update chunk with RunPod job ID
+	// Update chunk with provider job ID
 	job.mu.Lock()
 	if idx < len(job.Chunks) {
-		job.Chunks[idx].RunPodJobID = runpodJobID
+		job.Chunks[idx].RunPodJobID = providerJobID // Reuse this field for both providers
 		job.Chunks[idx].StartedAt = time.Now()
 	}
 	job.mu.Unlock()
 
-	s.logger.Info("chunk submitted to RunPod",
+	s.logger.Info("chunk submitted to provider",
 		slog.String("job_id", job.ID),
+		slog.String("provider", string(job.Provider)),
 		slog.Int("chunk_index", idx),
-		slog.String("runpod_job_id", runpodJobID),
+		slog.String("provider_job_id", providerJobID),
 	)
 
-	// Poll for result
-	videoB64, err := s.pollForResult(ctx, job.ID, idx, runpodJobID)
+	// Poll for result using generator
+	pollResult, err := s.pollForResultWithGenerator(ctx, gen, job.ID, idx, providerJobID)
 	if err != nil {
 		s.updateChunkStatus(job, idx, ChunkStatusFailed, err.Error())
-		return "", fmt.Errorf("failed to poll RunPod: %w", err)
+		return "", fmt.Errorf("failed to poll provider: %w", err)
 	}
 
-	// Save video to temp storage
-	videoData, err := base64.StdEncoding.DecodeString(videoB64)
-	if err != nil {
-		s.updateChunkStatus(job, idx, ChunkStatusFailed, err.Error())
-		return "", fmt.Errorf("failed to decode video: %w", err)
-	}
-
-	videoFileName := fmt.Sprintf("chunk_%s_%d.mp4", job.ID, idx)
-	videoPath, err := s.storage.SaveTemp(ctx, videoFileName, bytes.NewReader(videoData))
-	if err != nil {
-		s.updateChunkStatus(job, idx, ChunkStatusFailed, err.Error())
-		return "", fmt.Errorf("failed to save video: %w", err)
+	// Handle video output differently based on provider
+	var videoPath string
+	if pollResult.VideoBase64 != "" {
+		// RunPod path: decode base64 to file
+		videoData, err := base64.StdEncoding.DecodeString(pollResult.VideoBase64)
+		if err != nil {
+			s.updateChunkStatus(job, idx, ChunkStatusFailed, err.Error())
+			return "", fmt.Errorf("failed to decode video: %w", err)
+		}
+		videoFileName := fmt.Sprintf("chunk_%s_%d.mp4", job.ID, idx)
+		videoPath, err = s.storage.SaveTemp(ctx, videoFileName, bytes.NewReader(videoData))
+		if err != nil {
+			s.updateChunkStatus(job, idx, ChunkStatusFailed, err.Error())
+			return "", fmt.Errorf("failed to save video: %w", err)
+		}
+	} else if pollResult.VideoURL != "" {
+		// Beam path: download to temp file
+		videoPath = filepath.Join(filepath.Dir(audioPath), fmt.Sprintf("chunk_%s_%d.mp4", job.ID, idx))
+		if err := gen.DownloadOutput(ctx, pollResult.VideoURL, videoPath); err != nil {
+			s.updateChunkStatus(job, idx, ChunkStatusFailed, err.Error())
+			return "", fmt.Errorf("failed to download video: %w", err)
+		}
+	} else {
+		errMsg := "no video output from provider"
+		s.updateChunkStatus(job, idx, ChunkStatusFailed, errMsg)
+		return "", errors.New(errMsg)
 	}
 
 	// Update chunk status to completed
@@ -694,6 +731,104 @@ func (s *ProcessVideoService) pollForResult(ctx context.Context, jobID string, c
 				s.logger.Warn("unknown RunPod status",
 					slog.String("job_id", jobID),
 					slog.String("status", string(result.Status)),
+				)
+			}
+		}
+	}
+}
+
+// pollForResultWithGenerator polls using the generator interface until the job completes or fails.
+func (s *ProcessVideoService) pollForResultWithGenerator(
+	ctx context.Context,
+	gen generator.Generator,
+	jobID string,
+	chunkIdx int,
+	providerJobID string,
+) (generator.PollResult, error) {
+	ticker := time.NewTicker(s.pollInterval)
+	defer ticker.Stop()
+
+	var (
+		attempt    int
+		prevStatus generator.Status
+		firstPoll  = true
+	)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return generator.PollResult{}, fmt.Errorf("context cancelled: %w", ctx.Err())
+		case <-ticker.C:
+			attempt++
+			pollResult, err := gen.Poll(ctx, providerJobID)
+			if err != nil {
+				s.logger.Warn("poll error, retrying",
+					slog.String("job_id", jobID),
+					slog.Int("chunk_index", chunkIdx),
+					slog.String("provider_job_id", providerJobID),
+					slog.Int("attempt", attempt),
+					slog.String("error", err.Error()),
+				)
+				continue
+			}
+
+			// Consolidated poll log: Info if status changed or error, Debug otherwise
+			logLevel := slog.LevelDebug
+			if pollResult.Status != prevStatus || pollResult.Error != "" {
+				logLevel = slog.LevelInfo
+			}
+			prevStatusStr := string(prevStatus)
+			if firstPoll {
+				prevStatusStr = "initial"
+			}
+			s.logger.Log(ctx, logLevel, "provider poll update",
+				slog.String("job_id", jobID),
+				slog.Int("chunk_index", chunkIdx),
+				slog.String("provider_job_id", providerJobID),
+				slog.Int("attempt", attempt),
+				slog.String("status", string(pollResult.Status)),
+				slog.String("prev_status", prevStatusStr),
+				slog.String("error", pollResult.Error),
+			)
+
+			if pollResult.Error != "" {
+				s.logger.Info("provider reported error",
+					slog.String("job_id", jobID),
+					slog.Int("chunk_index", chunkIdx),
+					slog.String("provider_job_id", providerJobID),
+					slog.String("error", pollResult.Error),
+				)
+			}
+
+			// If status changed since last poll (and not first poll), record it at info level.
+			if pollResult.Status != prevStatus && !firstPoll {
+				s.logger.Info("provider status changed",
+					slog.String("job_id", jobID),
+					slog.Int("chunk_index", chunkIdx),
+					slog.String("provider_job_id", providerJobID),
+					slog.String("from", string(prevStatus)),
+					slog.String("to", string(pollResult.Status)),
+				)
+			}
+			firstPoll = false
+			prevStatus = pollResult.Status
+
+			// Map generator status to job status and handle terminal states
+			switch pollResult.Status {
+			case generator.StatusCompleted:
+				return pollResult, nil
+			case generator.StatusFailed:
+				return pollResult, fmt.Errorf("provider job failed: %s", pollResult.Error)
+			case generator.StatusCancelled:
+				return pollResult, errors.New("provider job cancelled")
+			case generator.StatusTimedOut:
+				return pollResult, errors.New("provider job timed out")
+			case generator.StatusPending, generator.StatusInQueue, generator.StatusRunning:
+				// Continue polling
+			default:
+				s.logger.Warn("unknown provider status",
+					slog.String("job_id", jobID),
+					slog.String("status", string(pollResult.Status)),
 				)
 			}
 		}

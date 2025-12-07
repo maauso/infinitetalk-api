@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/maauso/infinitetalk-api/internal/audio"
+	"github.com/maauso/infinitetalk-api/internal/beam"
 	"github.com/maauso/infinitetalk-api/internal/config"
 	"github.com/maauso/infinitetalk-api/internal/job"
 	"github.com/maauso/infinitetalk-api/internal/media"
@@ -32,15 +33,18 @@ func NewDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, er
 		return nil, fmt.Errorf("create RunPod client: %w", err)
 	}
 
-	// Log Beam configuration if available
+	// Initialize Beam client if enabled
+	var beamClient beam.Client
 	if cfg.BeamEnabled() {
-		logger.Info("Beam provider configured",
+		beamClient, err = beam.NewClient(cfg.BeamQueueURL, beam.WithToken(cfg.BeamToken))
+		if err != nil {
+			return nil, fmt.Errorf("create Beam client: %w", err)
+		}
+		logger.Info("Beam provider initialized",
 			slog.String("queue_url", cfg.BeamQueueURL),
 			slog.Int("poll_interval_ms", cfg.BeamPollIntervalMs),
 			slog.Int("poll_timeout_sec", cfg.BeamPollTimeoutSec),
 		)
-		// Note: Beam integration is configured but ProcessVideoService orchestration
-		// needs to be updated to use the Generator interface. For now, only RunPod is active.
 	}
 
 	// Initialize media processor and audio splitter
@@ -63,6 +67,7 @@ func NewDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, er
 		processor,
 		splitter,
 		runpodClient,
+		beamClient,
 		store,
 		logger,
 		job.WithSplitOpts(splitOpts),

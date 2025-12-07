@@ -107,7 +107,7 @@ func newTestService(t *testing.T) (*ProcessVideoService, *mockProcessor, *mockSp
 	storageClient := &mockStorage{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, logger,
+	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, nil, storageClient, logger,
 		WithPollInterval(10*time.Millisecond),
 	)
 
@@ -122,7 +122,7 @@ func TestNewProcessVideoService(t *testing.T) {
 	storageClient := &mockStorage{}
 
 	// With nil logger
-	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, nil)
+	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, nil, storageClient, nil)
 	if svc == nil {
 		t.Fatal("expected non-nil service")
 	}
@@ -132,7 +132,7 @@ func TestNewProcessVideoService(t *testing.T) {
 
 	// With custom logger
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	svc2 := NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, logger)
+	svc2 := NewProcessVideoService(repo, processor, splitter, runpodClient, nil, storageClient, logger)
 	if svc2.logger != logger {
 		t.Error("expected custom logger to be set")
 	}
@@ -145,7 +145,7 @@ func TestNewProcessVideoService_WithOptions(t *testing.T) {
 	runpodClient := &mockRunpodClient{}
 	storageClient := &mockStorage{}
 
-	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, nil,
+	svc := NewProcessVideoService(repo, processor, splitter, runpodClient, nil, storageClient, nil,
 		WithSplitOpts(audio.SplitOpts{ChunkTargetSec: 30}),
 		WithPollInterval(10*time.Second),
 	)

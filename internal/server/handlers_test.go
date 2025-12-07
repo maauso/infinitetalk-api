@@ -109,7 +109,7 @@ func newTestHandlers(t *testing.T) (*Handlers, *mockProcessor, *mockSplitter, *m
 	storageClient := &mockStorage{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	svc := job.NewProcessVideoService(repo, processor, splitter, runpodClient, storageClient, logger,
+	svc := job.NewProcessVideoService(repo, processor, splitter, runpodClient, nil, storageClient, logger,
 		job.WithPollInterval(10*time.Millisecond),
 	)
 
