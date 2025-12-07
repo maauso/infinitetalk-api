@@ -580,7 +580,7 @@ func (s *ProcessVideoService) processChunkWithGenerator(
 		Prompt:       "", // Use default prompt from provider
 		Width:        width,
 		Height:       height,
-		ForceOffload: true, // Default for Beam, ignored by RunPod
+		ForceOffload: job.Provider == ProviderBeam, // Beam-specific option, ignored by RunPod
 	}
 	providerJobID, err := gen.Submit(ctx, imageB64, audioB64, submitOpts)
 	if err != nil {
