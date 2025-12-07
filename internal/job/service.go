@@ -39,6 +39,8 @@ type ProcessVideoInput struct {
 	Width int
 	// Height is the target video height.
 	Height int
+	// Provider is the video generation provider ("runpod" or "beam").
+	Provider string
 	// PushToS3 indicates whether to upload the final video to S3.
 	PushToS3 bool
 	// DryRun skips RunPod calls and completes after preprocessing.
@@ -135,8 +137,21 @@ func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoI
 	job.Height = input.Height
 	job.PushToS3 = input.PushToS3
 
+	// Set provider (default to runpod if empty)
+	if input.Provider == "" {
+		job.Provider = ProviderRunPod
+	} else {
+		job.Provider = Provider(input.Provider)
+	}
+
+	// Validate provider
+	if !job.Provider.IsValid() {
+		return nil, fmt.Errorf("invalid provider: %s", input.Provider)
+	}
+
 	s.logger.Info("creating new job",
 		slog.String("job_id", job.ID),
+		slog.String("provider", string(job.Provider)),
 		slog.Int("width", input.Width),
 		slog.Int("height", input.Height),
 		slog.Bool("push_to_s3", input.PushToS3),
