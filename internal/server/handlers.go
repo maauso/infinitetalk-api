@@ -76,12 +76,19 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default provider to runpod if not specified
+	provider := req.Provider
+	if provider == "" {
+		provider = "runpod"
+	}
+
 	// Create the job through the service
 	input := job.ProcessVideoInput{
 		ImageBase64: req.ImageBase64,
 		AudioBase64: req.AudioBase64,
 		Width:       req.Width,
 		Height:      req.Height,
+		Provider:    provider,
 		PushToS3:    req.PushToS3,
 		DryRun:      req.DryRun,
 	}
@@ -146,6 +153,7 @@ func (h *Handlers) GetJob(w http.ResponseWriter, r *http.Request) {
 
 	resp := JobResponse{
 		ID:       foundJob.ID,
+		Provider: string(foundJob.Provider),
 		Status:   string(foundJob.Status),
 		Progress: foundJob.Progress,
 		Error:    foundJob.Error,

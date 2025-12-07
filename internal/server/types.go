@@ -15,6 +15,8 @@ type CreateJobRequest struct {
 	Width int `json:"width" validate:"required,min=1,max=4096"`
 	// Height is the target video height.
 	Height int `json:"height" validate:"required,min=1,max=4096"`
+	// Provider specifies the video generation provider ("runpod" or "beam"). Defaults to "runpod".
+	Provider string `json:"provider" validate:"omitempty,oneof=runpod beam"`
 	// PushToS3 indicates whether to upload the final video to S3.
 	PushToS3 bool `json:"push_to_s3"`
 	// DryRun skips RunPod calls and completes after preprocessing.
@@ -33,6 +35,8 @@ type CreateJobResponse struct {
 type JobResponse struct {
 	// ID is the unique identifier for the job.
 	ID string `json:"id"`
+	// Provider is the video generation provider used for this job.
+	Provider string `json:"provider"`
 	// Status is the current job status.
 	Status string `json:"status"`
 	// Progress is the percentage of completion (0-100).

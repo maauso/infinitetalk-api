@@ -27,6 +27,8 @@ var (
 	ErrRunPodJobCancelled = errors.New("RunPod job cancelled")
 	// ErrRunPodJobTimedOut is returned when a RunPod job times out.
 	ErrRunPodJobTimedOut = errors.New("RunPod job timed out")
+	// ErrInvalidProvider is returned when an invalid provider is specified.
+	ErrInvalidProvider = errors.New("invalid provider")
 )
 
 // ProcessVideoInput contains the input parameters for video processing.
@@ -39,6 +41,8 @@ type ProcessVideoInput struct {
 	Width int
 	// Height is the target video height.
 	Height int
+	// Provider is the video generation provider ("runpod" or "beam").
+	Provider string
 	// PushToS3 indicates whether to upload the final video to S3.
 	PushToS3 bool
 	// DryRun skips RunPod calls and completes after preprocessing.
@@ -135,8 +139,21 @@ func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoI
 	job.Height = input.Height
 	job.PushToS3 = input.PushToS3
 
+	// Set provider (default to runpod if empty)
+	if input.Provider == "" {
+		job.Provider = ProviderRunPod
+	} else {
+		job.Provider = Provider(input.Provider)
+	}
+
+	// Validate provider
+	if !job.Provider.IsValid() {
+		return nil, fmt.Errorf("%w: %s", ErrInvalidProvider, input.Provider)
+	}
+
 	s.logger.Info("creating new job",
 		slog.String("job_id", job.ID),
+		slog.String("provider", string(job.Provider)),
 		slog.Int("width", input.Width),
 		slog.Int("height", input.Height),
 		slog.Bool("push_to_s3", input.PushToS3),
@@ -197,6 +214,16 @@ func (s *ProcessVideoService) Process(ctx context.Context, input ProcessVideoInp
 
 // processJob executes the video processing workflow for the given job.
 func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input ProcessVideoInput) (*ProcessVideoOutput, error) {
+	// Check if Beam provider is requested
+	if job.Provider == ProviderBeam {
+		errMsg := "Beam provider is not yet fully integrated in ProcessVideoService orchestration"
+		s.logger.Error(errMsg,
+			slog.String("job_id", job.ID),
+			slog.String("provider", string(job.Provider)),
+		)
+		return s.failJob(ctx, job, errMsg)
+	}
+
 	// Track temporary files for cleanup
 	var tempFiles []string
 	defer func() { //nolint:contextcheck // Using context.Background() intentionally for cleanup
@@ -225,6 +252,7 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 
 	s.logger.Info("job started, processing video",
 		slog.String("job_id", job.ID),
+		slog.String("provider", string(job.Provider)),
 	)
 
 	// Step 1: Decode and save input image

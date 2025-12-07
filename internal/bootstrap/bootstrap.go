@@ -32,6 +32,17 @@ func NewDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, er
 		return nil, fmt.Errorf("create RunPod client: %w", err)
 	}
 
+	// Log Beam configuration if available
+	if cfg.BeamEnabled() {
+		logger.Info("Beam provider configured",
+			slog.String("queue_url", cfg.BeamQueueURL),
+			slog.Int("poll_interval_ms", cfg.BeamPollIntervalMs),
+			slog.Int("poll_timeout_sec", cfg.BeamPollTimeoutSec),
+		)
+		// Note: Beam integration is configured but ProcessVideoService orchestration
+		// needs to be updated to use the Generator interface. For now, only RunPod is active.
+	}
+
 	// Initialize media processor and audio splitter
 	processor := media.NewFFmpegProcessor("")
 	splitter := audio.NewFFmpegSplitter("")
