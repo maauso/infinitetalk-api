@@ -23,9 +23,10 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          # Get the latest semantic version tag (v*.*.*)
-          LATEST_TAG=$(git tag -l "v[0-9]*.[0-9]*.[0-9]" \
-            --sort=-version:refname | head -n 1)
+          # Get the latest semantic version tag (exact format: v#.#.#)
+          # Use grep to filter for exact semantic version format
+          LATEST_TAG=$(git tag -l "v*" --sort=-version:refname | \
+            grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
           if [ -z "$LATEST_TAG" ]; then
             LATEST_TAG="v0.0.0"
           fi
@@ -34,7 +35,7 @@ jobs:
           # Parse version components (strip 'v' prefix)
           VERSION=${LATEST_TAG#v}
 
-          # Validate format is numeric
+          # Validate format is numeric (should always pass due to grep above)
           if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "Error: Invalid version format: $VERSION"
             exit 1
