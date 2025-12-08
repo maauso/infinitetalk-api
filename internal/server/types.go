@@ -15,6 +15,8 @@ type CreateJobRequest struct {
 	Width int `json:"width" validate:"required,min=1,max=4096"`
 	// Height is the target video height.
 	Height int `json:"height" validate:"required,min=1,max=4096"`
+	// Prompt is the text prompt for video generation. Defaults to "A person talking naturally" if not provided.
+	Prompt string `json:"prompt" validate:"omitempty"`
 	// Provider specifies the video generation provider ("runpod" or "beam"). Defaults to "runpod".
 	Provider string `json:"provider" validate:"omitempty,oneof=runpod beam"`
 	// PushToS3 indicates whether to upload the final video to S3.

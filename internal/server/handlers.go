@@ -88,6 +88,7 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		AudioBase64: req.AudioBase64,
 		Width:       req.Width,
 		Height:      req.Height,
+		Prompt:      req.Prompt,
 		Provider:    provider,
 		PushToS3:    req.PushToS3,
 		DryRun:      req.DryRun,

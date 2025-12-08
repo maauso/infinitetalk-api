@@ -125,6 +125,8 @@ type Job struct {
 	Progress int
 	// Error contains any error message if the job failed.
 	Error string
+	// Prompt is the text prompt for video generation.
+	Prompt string
 	// InputImagePath is the path to the source image.
 	InputImagePath string
 	// InputAudioPath is the path to the source audio.
@@ -318,6 +320,7 @@ func (j *Job) Clone() *Job {
 		Chunks:          chunks,
 		Progress:        j.Progress,
 		Error:           j.Error,
+		Prompt:          j.Prompt,
 		InputImagePath:  j.InputImagePath,
 		InputAudioPath:  j.InputAudioPath,
 		OutputVideoPath: j.OutputVideoPath,
