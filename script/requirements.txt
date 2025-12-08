@@ -1,0 +1,11 @@
+# Requirements for Infinitetalk API Python clients
+# Install with: pip install -r requirements.txt
+
+# HTTP requests
+requests>=2.31.0
+
+# Progress bars
+tqdm>=4.66.0
+
+# Environment variables from .env files
+python-dotenv>=1.0.0
