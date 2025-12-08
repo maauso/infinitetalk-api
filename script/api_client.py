@@ -164,6 +164,23 @@ def save_video_output(job_info, output_path):
     print("⚠️ No video output found in job result")
     sys.exit(1)
 
+def download_job_video(api_url, job_id, output_path):
+    """Download and decode a video from a completed job using job_id."""
+    print(f"🔍 Fetching job {job_id}...")
+    job_info = get_job_status(api_url, job_id)
+
+    status = job_info.get("status", "UNKNOWN")
+    error = job_info.get("error", "")
+
+    if status != "COMPLETED":
+        print(f"❌ Job is not completed. Current status: {status}")
+        if error:
+            print(f"Error: {error}")
+        sys.exit(1)
+
+    print(f"✅ Job {job_id} is completed. Downloading video...")
+    save_video_output(job_info, output_path)
+
 def main():
     parser = argparse.ArgumentParser(
         description="Infinitetalk API Client - Lip-sync video generation",
@@ -184,12 +201,15 @@ Examples:
 
   # Dry run (preprocessing only, no video generation)
   %(prog)s -i photo.jpg -a audio.wav --dry-run
+
+  # Download completed job video by job-id
+  %(prog)s --download job-id-here -o output.mp4
         """
     )
 
-    # Required arguments
-    parser.add_argument("-i", "--image", required=True, help="Input image file path")
-    parser.add_argument("-a", "--audio", required=True, help="Input audio file path (WAV, MP3, etc.)")
+    # Optional arguments for creation mode
+    parser.add_argument("-i", "--image", help="Input image file path")
+    parser.add_argument("-a", "--audio", help="Input audio file path (WAV, MP3, etc.)")
     parser.add_argument("-o", "--output", default="output.mp4", help="Output video filename (default: output.mp4)")
 
     # Optional arguments
@@ -202,23 +222,27 @@ Examples:
     parser.add_argument("--dry-run", action="store_true",
                         help="Preprocessing only, skip video generation")
 
+    # Download mode argument
+    parser.add_argument("--download", help="Download video from a completed job using job-id (skips creation)")
+
     # API configuration
     parser.add_argument("--api-url", default=API_URL,
                         help=f"Infinitetalk API URL (default: {API_URL})")
     parser.add_argument("--poll-interval", type=int, default=5,
                         help="Status polling interval in seconds (default: 5)")
-    parser.add_argument("--timeout", type=int, default=3600,
-                        help="Job timeout in seconds (default: 3600)")
+    parser.add_argument("--timeout", type=int, default=7200,
+                        help="Job timeout in seconds (default: 7200)")
 
     args = parser.parse_args()
 
-    # Validate input files exist
-    if not os.path.isfile(args.image):
-        print(f"❌ Error: Image file not found: {args.image}")
-        sys.exit(1)
+    # Handle download mode
+    if args.download:
+        download_job_video(args.api_url, args.download, args.output)
+        return
 
-    if not os.path.isfile(args.audio):
-        print(f"❌ Error: Audio file not found: {args.audio}")
+    # Validate input files exist for creation mode
+    if not args.image or not args.audio:
+        print("❌ Error: -i/--image and -a/--audio are required (unless using --download)")
         sys.exit(1)
 
     # Convert files to base64

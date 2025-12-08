@@ -46,18 +46,24 @@ pip install -r requirements.txt
 ./api_client.py -i photo.jpg -a audio.wav --api-url https://api.example.com
 ```
 
+**Download completed job video:**
+```bash
+./api_client.py --download job-id-here -o output.mp4
+```
+
 #### Arguments
 
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `-i`, `--image` | Yes | — | Input image file path |
-| `-a`, `--audio` | Yes | — | Input audio file path (WAV, MP3, etc.) |
+| `-i`, `--image` | Conditional | — | Input image file path (required unless using `--download`) |
+| `-a`, `--audio` | Conditional | — | Input audio file path (required unless using `--download`) |
 | `-o`, `--output` | No | `output.mp4` | Output video filename |
 | `-w`, `--width` | No | `384` | Video width in pixels |
 | `-H`, `--height` | No | `384` | Video height in pixels |
 | `--provider` | No | `runpod` | Provider: `runpod` or `beam` |
 | `--push-to-s3` | No | `false` | Upload to S3 instead of base64 |
 | `--dry-run` | No | `false` | Preprocessing only, skip generation |
+| `--download` | No | — | Download video from completed job by job-id (skips creation) |
 | `--api-url` | No | `http://localhost:8080` | Infinitetalk API URL |
 | `--poll-interval` | No | `5` | Status polling interval (seconds) |
 | `--timeout` | No | `3600` | Job timeout (seconds) |
@@ -76,6 +82,7 @@ export INFINITETALK_API_URL=http://localhost:8080
 - ✅ Polling with progress bar (0-100%)
 - ✅ Automatic output handling (base64 or S3)
 - ✅ Support for both RunPod and Beam providers
+- ✅ Download completed jobs by ID
 - ✅ Configurable timeouts and polling intervals
 - ✅ Dry-run mode for testing
 
@@ -199,6 +206,16 @@ export BEAM_TOKEN=your-token
 ### Example 4: Dry run to test preprocessing
 ```bash
 ./api_client.py -i examples/face.jpg -a examples/speech.wav --dry-run
+```
+
+### Example 5: Download a completed job
+```bash
+./api_client.py --download abc123def456 -o result_from_job.mp4
+```
+
+### Example 6: Download from remote API
+```bash
+./api_client.py --download abc123def456 -o result.mp4 --api-url https://api.example.com
 ```
 
 ---
