@@ -1,7 +1,7 @@
 ---
 name: Release and Docker Build
 
-"on":
+on:
   push:
     branches:
       - main
@@ -24,7 +24,6 @@ jobs:
         id: version
         run: |
           # Get the latest semantic version tag (exact format: v#.#.#)
-          # Use grep to filter for exact semantic version format
           LATEST_TAG=$(git tag -l "v*" --sort=-version:refname | \
             grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
           if [ -z "$LATEST_TAG" ]; then
@@ -34,13 +33,6 @@ jobs:
 
           # Parse version components (strip 'v' prefix)
           VERSION=${LATEST_TAG#v}
-
-          # Validate format is numeric (should always pass due to grep above)
-          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Error: Invalid version format: $VERSION"
-            exit 1
-          fi
-
           MAJOR=$(echo "$VERSION" | cut -d. -f1)
           MINOR=$(echo "$VERSION" | cut -d. -f2)
           PATCH=$(echo "$VERSION" | cut -d. -f3)
