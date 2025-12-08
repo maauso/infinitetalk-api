@@ -60,7 +60,7 @@ pip install -r requirements.txt
 | `--dry-run` | No | `false` | Preprocessing only, skip generation |
 | `--api-url` | No | `http://localhost:8080` | Infinitetalk API URL |
 | `--poll-interval` | No | `5` | Status polling interval (seconds) |
-| `--timeout` | No | `600` | Job timeout (seconds) |
+| `--timeout` | No | `3600` | Job timeout (seconds) |
 
 #### Environment Variables
 
