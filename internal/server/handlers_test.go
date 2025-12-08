@@ -565,3 +565,105 @@ func TestDeleteJobVideo_MissingID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "MISSING_JOB_ID", resp.Code)
 }
+
+func TestCreateJob_WithPrompt(t *testing.T) {
+	h, _, _, _, _, repo := newTestHandlers(t)
+	ctx := context.Background()
+
+	body := CreateJobRequest{
+		ImageBase64: base64.StdEncoding.EncodeToString([]byte("test-image")),
+		AudioBase64: base64.StdEncoding.EncodeToString([]byte("test-audio")),
+		Width:       384,
+		Height:      576,
+		Prompt:      "A custom prompt for testing",
+		PushToS3:    false,
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.CreateJob(rec, req)
+
+	assert.Equal(t, http.StatusAccepted, rec.Code)
+
+	var resp CreateJobResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.ID)
+	assert.Equal(t, "IN_QUEUE", resp.Status)
+
+	// Verify the job was created with the custom prompt
+	createdJob, err := repo.FindByID(ctx, resp.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "A custom prompt for testing", createdJob.Prompt)
+}
+
+func TestCreateJob_DefaultPrompt(t *testing.T) {
+	h, _, _, _, _, repo := newTestHandlers(t)
+	ctx := context.Background()
+
+	body := CreateJobRequest{
+		ImageBase64: base64.StdEncoding.EncodeToString([]byte("test-image")),
+		AudioBase64: base64.StdEncoding.EncodeToString([]byte("test-audio")),
+		Width:       384,
+		Height:      576,
+		// Prompt is omitted, should default to "A person talking naturally"
+		PushToS3: false,
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.CreateJob(rec, req)
+
+	assert.Equal(t, http.StatusAccepted, rec.Code)
+
+	var resp CreateJobResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.ID)
+	assert.Equal(t, "IN_QUEUE", resp.Status)
+
+	// Verify the job was created with the default prompt
+	createdJob, err := repo.FindByID(ctx, resp.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "A person talking naturally", createdJob.Prompt)
+}
+
+func TestCreateJob_EmptyPromptUsesDefault(t *testing.T) {
+	h, _, _, _, _, repo := newTestHandlers(t)
+	ctx := context.Background()
+
+	body := CreateJobRequest{
+		ImageBase64: base64.StdEncoding.EncodeToString([]byte("test-image")),
+		AudioBase64: base64.StdEncoding.EncodeToString([]byte("test-audio")),
+		Width:       384,
+		Height:      576,
+		Prompt:      "", // Empty prompt should use default
+		PushToS3:    false,
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.CreateJob(rec, req)
+
+	assert.Equal(t, http.StatusAccepted, rec.Code)
+
+	var resp CreateJobResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.ID)
+	assert.Equal(t, "IN_QUEUE", resp.Status)
+
+	// Verify the job was created with the default prompt
+	createdJob, err := repo.FindByID(ctx, resp.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "A person talking naturally", createdJob.Prompt)
+}
