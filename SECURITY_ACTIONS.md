@@ -30,9 +30,14 @@
 **File**: `internal/server/handlers.go`
 
 ```go
+const (
+    // MaxRequestBodyBytes is the maximum allowed request body size (100MB)
+    MaxRequestBodyBytes = 100 * 1024 * 1024
+)
+
 func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
-    // Limit request body to 100MB
-    r.Body = http.MaxBytesReader(w, r.Body, 100*1024*1024)
+    // Limit request body to prevent DoS attacks
+    r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBodyBytes)
     defer r.Body.Close()
     
     var req CreateJobRequest
@@ -64,19 +69,17 @@ MaxRequestBodyBytes int64 `env:"MAX_REQUEST_BODY_BYTES, default=104857600" json:
 package server
 
 import (
+    "crypto/sha256"
+    "crypto/subtle"
+    "encoding/hex"
+    "log/slog"
     "net/http"
     "strings"
 )
 
-// APIKeyMiddleware validates API keys for all requests
-func APIKeyMiddleware(validKeys map[string]bool, logger *slog.Logger) func(http.Handler) http.Handler {
-    // NOTE: This implementation stores API keys in plaintext in memory.
-    // For production, consider:
-    // 1. Store hashed keys (SHA256) in the map
-    // 2. Hash incoming keys before comparison
-    // 3. Use constant-time comparison (subtle.ConstantTimeCompare)
-    // 4. Load keys from secure secret management (HashiCorp Vault, AWS Secrets Manager)
-    
+// APIKeyMiddleware validates API keys for all requests.
+// This implementation uses SHA256 hashing and constant-time comparison for security.
+func APIKeyMiddleware(validKeyHashes map[string]bool, logger *slog.Logger) func(http.Handler) http.Handler {
     return func(next http.Handler) http.Handler {
         return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
             // Skip auth for health check
@@ -102,7 +105,9 @@ func APIKeyMiddleware(validKeys map[string]bool, logger *slog.Logger) func(http.
                 return
             }
 
-            if !validKeys[apiKey] {
+            // Hash the incoming key and compare using constant-time comparison
+            keyHash := hashAPIKey(apiKey)
+            if !validKeyHashes[keyHash] {
                 logger.Warn("invalid API key",
                     slog.String("path", r.URL.Path),
                     slog.String("remote_addr", r.RemoteAddr))
@@ -116,7 +121,26 @@ func APIKeyMiddleware(validKeys map[string]bool, logger *slog.Logger) func(http.
         })
     }
 }
+
+// hashAPIKey creates a SHA256 hash of the API key for secure storage.
+func hashAPIKey(key string) string {
+    hash := sha256.Sum256([]byte(key))
+    return hex.EncodeToString(hash[:])
+}
+
+// ValidateAPIKeyConstantTime performs constant-time comparison to prevent timing attacks.
+// Use this for comparing API keys or hashes.
+func ValidateAPIKeyConstantTime(provided, expected string) bool {
+    return subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) == 1
+}
 ```
+
+**Note**: For production, also consider:
+1. Load keys from secure secret management (HashiCorp Vault, AWS Secrets Manager)
+2. Use pepper (server-side secret) in addition to hashing
+3. Implement key rotation mechanism
+4. Add rate limiting per API key
+
 
 **Configuration**:
 ```go
@@ -126,21 +150,24 @@ APIKeys string `env:"API_KEYS" json:"-"` // Comma-separated API keys
 
 **Usage in routes.go**:
 ```go
-// Parse API keys from config
-apiKeyMap := make(map[string]bool)
+// Parse and hash API keys from config
+apiKeyHashes := make(map[string]bool)
 if cfg.APIKeys != "" {
     keys := strings.Split(cfg.APIKeys, ",")
     for _, key := range keys {
         key := strings.TrimSpace(key)
         if key != "" {
-            apiKeyMap[key] = true
+            // Hash the key before storing
+            keyHash := hashAPIKey(key)
+            apiKeyHashes[keyHash] = true
         }
     }
 }
 
 // Apply to all routes except health
 mux.HandleFunc("GET /health", handlers.Health) // No auth
-protectedMux := APIKeyMiddleware(apiKeyMap, logger)(mux)
+protectedMux := APIKeyMiddleware(apiKeyHashes, logger)(mux)
+```
 ```
 
 **Documentation**:
