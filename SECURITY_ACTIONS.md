@@ -124,7 +124,8 @@ apiKeyMap := make(map[string]bool)
 if cfg.APIKeys != "" {
     keys := strings.Split(cfg.APIKeys, ",")
     for _, key := range keys {
-        if key = strings.TrimSpace(key); key != "" {
+        key := strings.TrimSpace(key)
+        if key != "" {
             apiKeyMap[key] = true
         }
     }
