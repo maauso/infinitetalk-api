@@ -54,7 +54,7 @@ pip install -r requirements.txt
 | `-a`, `--audio` | Yes | — | Input audio file path (WAV, MP3, etc.) |
 | `-o`, `--output` | No | `output.mp4` | Output video filename |
 | `-w`, `--width` | No | `384` | Video width in pixels |
-| `-H`, `--height` | No | `540` | Video height in pixels |
+| `-H`, `--height` | No | `384` | Video height in pixels |
 | `--provider` | No | `runpod` | Provider: `runpod` or `beam` |
 | `--push-to-s3` | No | `false` | Upload to S3 instead of base64 |
 | `--dry-run` | No | `false` | Preprocessing only, skip generation |
