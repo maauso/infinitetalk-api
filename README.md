@@ -228,6 +228,22 @@ The API exclusively uses **WAV PCM (pcm_s16le)** format for audio chunks to ensu
 
 This ensures that RunPod/ComfyUI can decode audio without "Invalid data found when processing input" errors.
 
+## Python Clients
+
+Ready-to-use Python clients are available in the `script/` directory for easy integration:
+
+- **`api_client.py`** - Main client for the Infinitetalk API with automatic polling and output handling
+- **`beam_client.py`** - Direct Beam.cloud client for testing
+
+See [script/README.md](script/README.md) for detailed usage instructions.
+
+**Quick example:**
+```bash
+cd script
+pip install -r requirements.txt
+./api_client.py -i photo.jpg -a audio.wav -o output.mp4 --provider beam
+```
+
 ## Repository Layout
 
 ```
@@ -240,8 +256,13 @@ internal/
 ├── runpod/     # RunPod HTTP client
 ├── server/     # HTTP handlers and middlewares
 └── storage/    # Temp storage and S3
+script/
+├── api_client.py    # Python client for Infinitetalk API
+├── beam_client.py   # Python client for Beam.cloud
+├── requirements.txt # Python dependencies
+└── README.md        # Client documentation
 api/
-└── openapi.yaml   # OpenAPI 3.0 specification
+└── openapi.yaml     # OpenAPI 3.0 specification
 ```
 
 ## Provider Support
