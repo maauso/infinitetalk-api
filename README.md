@@ -16,6 +16,19 @@
 
 Infinitetalk is a lightweight REST API that creates lip-synced videos. It accepts an image and a WAV audio file, splits the audio into chunks at silence boundaries, submits chunks to a RunPod or Beam worker, stitches the partial videos with `ffmpeg`, and returns or uploads the final video.
 
+Related projects and provider hubs
+---------------------------------
+This project prepares audio/image payloads and orchestrates work with provider-specific hubs and reference implementations. See the following related repositories for provider-side workers, reference implementations, and community contributions:
+
+- `https://github.com/maauso/Infinitetalk_Beam_hub` — Beam provider hub and task worker adapter. Use this if you want to run provider-side workers that consume the Beam tasks produced by this API.
+- `https://github.com/maauso/Infinitetalk_Runpod_hub` — RunPod provider hub and worker scripts. Contains example RunPod endpoints and helper code used by the API to submit jobs.
+- `https://github.com/MeiGen-AI/InfiniteTalk` — Independent/open-source InfiniteTalk implementation and research code. Helpful as a reference implementation and for compatibility testing.
+
+- **Compatibility:** This repository acts as the orchestration/originator of jobs. For full end-to-end operation you will generally combine this API with one of the provider hubs above (RunPod or Beam) which run the actual lip-sync model and return partial videos.
+
+If you maintain or deploy provider workers, please check the corresponding hub repo for deployment, Dockerfile and worker configuration details.
+
+
 ## Features
 
 - **Silence-based audio splitting** — cuts audio at natural pauses to avoid artifacts.
