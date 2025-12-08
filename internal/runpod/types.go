@@ -38,11 +38,12 @@ type SubmitOptions struct {
 // DefaultSubmitOptions returns the default options for submitting a job.
 func DefaultSubmitOptions() SubmitOptions {
 	return SubmitOptions{
-		Prompt:      "high quality, realistic, speaking naturally",
-		Width:       384,
-		Height:      576,
-		InputType:   "image",
-		PersonCount: "single",
+		Prompt:       "high quality, realistic, speaking naturally",
+		Width:        384,
+		Height:       576,
+		InputType:    "image",
+		PersonCount:  "single",
+		ForceOffload: true,
 	}
 }
 
