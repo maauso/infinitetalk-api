@@ -42,6 +42,8 @@ func run() error {
 		slog.String("temp_dir", cfg.TempDir),
 		slog.Int("chunk_target_sec", cfg.ChunkTargetSec),
 		slog.Bool("s3_enabled", cfg.S3Enabled()),
+		slog.Bool("beam_enabled", cfg.BeamEnabled()),
+		slog.String("runpod_endpoint_id", cfg.RunPodEndpointID),
 	)
 
 	// Initialize dependencies using bootstrap

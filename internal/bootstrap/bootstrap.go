@@ -4,6 +4,7 @@ package bootstrap
 import (
 	"fmt"
 	"log/slog"
+	"os/exec"
 
 	"github.com/maauso/infinitetalk-api/internal/audio"
 	"github.com/maauso/infinitetalk-api/internal/beam"
@@ -32,6 +33,11 @@ func NewDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, er
 	if err != nil {
 		return nil, fmt.Errorf("create RunPod client: %w", err)
 	}
+	// Log RunPod initialization without exposing API key
+	logger.Info("RunPod client initialized",
+		slog.String("endpoint_id", cfg.RunPodEndpointID),
+		slog.Bool("api_key_set", cfg.RunPodAPIKey != ""),
+	)
 
 	// Initialize Beam client if enabled
 	var beamClient beam.Client
@@ -45,11 +51,25 @@ func NewDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, er
 			slog.Int("poll_interval_ms", cfg.BeamPollIntervalMs),
 			slog.Int("poll_timeout_sec", cfg.BeamPollTimeoutSec),
 		)
+	} else {
+		logger.Info("Beam provider disabled")
 	}
 
 	// Initialize media processor and audio splitter
 	processor := media.NewFFmpegProcessor("")
 	splitter := audio.NewFFmpegSplitter("")
+
+	// Check for ffmpeg binary availability and log processor details
+	if ffPath, ffErr := exec.LookPath("ffmpeg"); ffErr != nil {
+		logger.Warn("ffmpeg not found in PATH; processor may fail",
+			slog.String("ffmpeg_path", "not_found"),
+		)
+	} else {
+		logger.Info("media processor initialized",
+			slog.String("ffmpeg_path", ffPath),
+		)
+	}
+	logger.Info("audio splitter initialized")
 
 	// Initialize job repository
 	repo := job.NewMemoryRepository()
