@@ -70,6 +70,13 @@ import (
 
 // APIKeyMiddleware validates API keys for all requests
 func APIKeyMiddleware(validKeys map[string]bool, logger *slog.Logger) func(http.Handler) http.Handler {
+    // NOTE: This implementation stores API keys in plaintext in memory.
+    // For production, consider:
+    // 1. Store hashed keys (SHA256) in the map
+    // 2. Hash incoming keys before comparison
+    // 3. Use constant-time comparison (subtle.ConstantTimeCompare)
+    // 4. Load keys from secure secret management (HashiCorp Vault, AWS Secrets Manager)
+    
     return func(next http.Handler) http.Handler {
         return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
             // Skip auth for health check
@@ -221,9 +228,15 @@ func (rl *RateLimiter) Cleanup(maxAge time.Duration) {
     rl.mu.Lock()
     defer rl.mu.Unlock()
     
-    // In production, track last used time and remove stale limiters
-    // For now, just limit the size
-    if len(rl.limiters) > 10000 {
+    // NOTE: This is a simple implementation that clears all limiters when limit is reached.
+    // Production considerations:
+    // 1. Track last access time per limiter
+    // 2. Remove only stale limiters (not accessed in maxAge)
+    // 3. Make maxLimitersCount configurable (default 10000)
+    // 4. Add metrics for limiter count and cleanup frequency
+    
+    const maxLimitersCount = 10000 // Configurable in production
+    if len(rl.limiters) > maxLimitersCount {
         rl.limiters = make(map[string]*rate.Limiter)
     }
 }
