@@ -279,6 +279,53 @@ api/
 - **Pending:** Full orchestration integration in `ProcessVideoService`
 - **Current Behavior:** Jobs with `provider: "beam"` will return an error indicating the feature is not yet fully integrated
 
+## CI/CD and Releases
+
+This repository uses GitHub Actions for continuous integration and deployment.
+
+### Automated Releases
+
+When a PR is merged to `main`, the release workflow automatically:
+1. Determines the next semantic version by incrementing the patch number (e.g., `v0.1.0` → `v0.1.1`)
+2. Creates a new GitHub Release with the version tag
+3. Builds a Docker image and pushes it to GitHub Container Registry (ghcr.io)
+4. Tags the Docker image with both the version number and `latest`
+
+### Docker Images
+
+Docker images are available at:
+```
+ghcr.io/maauso/infinitetalk-api:latest
+ghcr.io/maauso/infinitetalk-api:<version>
+```
+
+Pull the latest image:
+```bash
+docker pull ghcr.io/maauso/infinitetalk-api:latest
+```
+
+Pull a specific version:
+```bash
+docker pull ghcr.io/maauso/infinitetalk-api:0.1.0
+```
+
+### GitHub Secrets
+
+The release workflow uses the following secrets (automatically provided by GitHub):
+- `GITHUB_TOKEN` - Used for creating releases and pushing to GitHub Container Registry
+
+No additional secrets configuration is required. The workflow uses GitHub's built-in authentication.
+
+### Manual Version Control
+
+If you need to create a major or minor version bump instead of a patch:
+1. Create and push a tag manually:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+2. The next automated release will increment from that version
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
