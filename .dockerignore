@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+.github
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Documentation
+*.md
+!README.md
+SECURITY_REVIEW.md
+
+# CI/CD
+.github/
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Test artifacts
+*.test
+*.out
+coverage.out
+coverage.*
+*.coverprofile
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# Build artifacts
+infinitetalk-api
+server
+*__debug_*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependencies (will be downloaded during build)
+vendor/
+
+# Scripts (not needed in container)
+script/
+
+# API specs (not needed at runtime)
+api/
+
+# Development container config
+.devcontainer/

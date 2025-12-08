@@ -32,16 +32,38 @@ go.work.sum
 
 # env file
 .env
+.env.*
+!.env.example
 
 # Project binary
 infinitetalk-api
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
 # Binary output
 infinitetalk-api
 server
 *__debug_*
 tmp/*
+
+# Security-sensitive files
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+secrets/
+.secrets
+
+# Logs
+*.log
+
+# Backup files
+*.bak
+*.backup
