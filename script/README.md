@@ -228,7 +228,7 @@ export BEAM_TOKEN=your-beam-token-here
 
 ### Job Timeout
 ```
-⏱️ Timeout: Job did not complete within 600 seconds
+⏱️ Timeout: Job did not complete within 3600 seconds
 ```
 **Solution:** Increase timeout with `--timeout 1200` or check job status manually.
 
