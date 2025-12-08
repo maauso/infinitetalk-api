@@ -30,10 +30,10 @@ func (s Status) IsTerminal() bool {
 
 // SubmitOptions contains parameters for submitting a job.
 type SubmitOptions struct {
-	Prompt      string // Prompt text for generation
-	Width       int    // Video width in pixels
-	Height      int    // Video height in pixels
-	ForceOffload bool  // Whether to force offload (Beam-specific, ignored by RunPod)
+	Prompt       string // Prompt text for generation
+	Width        int    // Video width in pixels
+	Height       int    // Video height in pixels
+	ForceOffload bool   // Whether to force offload (supported by both Beam and RunPod)
 }
 
 // PollResult contains the result of polling a job's status.

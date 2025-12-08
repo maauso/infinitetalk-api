@@ -20,10 +20,10 @@ func NewRunPodAdapter(client runpod.Client) *RunPodAdapter {
 // Submit sends a lip-sync job to RunPod.
 func (a *RunPodAdapter) Submit(ctx context.Context, imageB64, audioB64 string, opts SubmitOptions) (string, error) {
 	runpodOpts := runpod.SubmitOptions{
-		Prompt: opts.Prompt,
-		Width:  opts.Width,
-		Height: opts.Height,
-		// RunPod doesn't use ForceOffload
+		Prompt:       opts.Prompt,
+		Width:        opts.Width,
+		Height:       opts.Height,
+		ForceOffload: opts.ForceOffload,
 	}
 	jobID, err := a.client.Submit(ctx, imageB64, audioB64, runpodOpts)
 	if err != nil {

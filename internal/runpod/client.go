@@ -146,7 +146,7 @@ func (c *HTTPClient) Submit(ctx context.Context, imageB64, audioB64 string, opts
 			Width:         opts.Width,
 			Height:        opts.Height,
 			NetworkVolume: false,
-			ForceOffload:  false,
+			ForceOffload:  opts.ForceOffload,
 		},
 	}
 
