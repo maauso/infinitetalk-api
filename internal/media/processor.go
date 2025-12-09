@@ -15,9 +15,4 @@ type Processor interface {
 	// It first attempts a fast copy (no re-encoding) and falls back to re-encoding
 	// with libx264/aac if the copy fails due to incompatible codecs.
 	JoinVideos(ctx context.Context, videoPaths []string, output string) error
-
-	// ExtractLastFrame extracts the last frame from a video file as a PNG image.
-	// Returns the image data as bytes. The caller is responsible for encoding
-	// to base64 if needed.
-	ExtractLastFrame(ctx context.Context, videoPath string) ([]byte, error)
 }
