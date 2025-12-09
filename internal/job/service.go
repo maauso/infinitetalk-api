@@ -480,9 +480,9 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 	}, nil
 }
 
-// processChunksSequential processes audio chunks one by one, using the last
-// frame of each video as the input image for the next chunk to maintain
-// visual continuity.
+// processChunksSequential processes audio chunks one by one, using the same
+// source image for all chunks to maintain visual consistency and avoid
+// cumulative visual drift.
 func (s *ProcessVideoService) processChunksSequential(
 	ctx context.Context,
 	job *Job,
@@ -492,7 +492,6 @@ func (s *ProcessVideoService) processChunksSequential(
 	width, height int,
 ) ([]string, error) {
 	videoPaths := make([]string, 0, len(audioChunks))
-	currentImageB64 := initialImageB64
 
 	for i, chunkPath := range audioChunks {
 		// Check context before starting each chunk
@@ -508,8 +507,10 @@ func (s *ProcessVideoService) processChunksSequential(
 			slog.Int("total_chunks", len(audioChunks)),
 		)
 
-		// Process this chunk
-		videoPath, err := s.processChunkWithGenerator(ctx, job, gen, i, currentImageB64, chunkPath, width, height)
+		// Process this chunk with the original image
+		videoPath, err := s.processChunkWithGenerator(
+			ctx, job, gen, i, initialImageB64, chunkPath, width, height,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("chunk %d failed: %w", i, err)
 		}
@@ -523,27 +524,6 @@ func (s *ProcessVideoService) processChunksSequential(
 				slog.String("job_id", job.ID),
 				slog.String("error", err.Error()),
 			)
-		}
-
-		// Extract last frame for continuity (except for the last chunk)
-		if i < len(audioChunks)-1 {
-			frameBytes, err := s.processor.ExtractLastFrame(ctx, videoPath)
-			if err != nil {
-				// Fallback: log warning but continue with previous image
-				s.logger.Warn("failed to extract last frame, using previous image",
-					slog.String("job_id", job.ID),
-					slog.Int("chunk_index", i),
-					slog.String("error", err.Error()),
-				)
-				// currentImageB64 stays the same (fallback)
-			} else {
-				currentImageB64 = base64.StdEncoding.EncodeToString(frameBytes)
-				s.logger.Debug("extracted last frame for continuity",
-					slog.String("job_id", job.ID),
-					slog.Int("chunk_index", i),
-					slog.Int("frame_size_bytes", len(frameBytes)),
-				)
-			}
 		}
 	}
 
