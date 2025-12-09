@@ -35,14 +35,6 @@ func (m *mockProcessor) JoinVideos(ctx context.Context, videoPaths []string, out
 	return args.Error(0)
 }
 
-func (m *mockProcessor) ExtractLastFrame(ctx context.Context, videoPath string) ([]byte, error) {
-	args := m.Called(ctx, videoPath)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]byte), args.Error(1)
-}
-
 // mockSplitter implements audio.Splitter for testing
 type mockSplitter struct {
 	mock.Mock
