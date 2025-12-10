@@ -631,7 +631,7 @@ func TestCreateJob_DefaultPrompt(t *testing.T) {
 	// Verify the job was created with the default prompt
 	createdJob, err := repo.FindByID(ctx, resp.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "A person talking naturally", createdJob.Prompt)
+	assert.Equal(t, "high quality, realistic, speaking naturally", createdJob.Prompt)
 }
 
 func TestCreateJob_EmptyPromptUsesDefault(t *testing.T) {
