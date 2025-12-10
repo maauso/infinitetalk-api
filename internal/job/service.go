@@ -173,7 +173,7 @@ func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoI
 
 	// Set prompt (default to "A person talking naturally" if not provided)
 	if input.Prompt == "" {
-		job.Prompt = "A person talking naturally"
+		job.Prompt = "high quality, realistic, speaking naturally"
 	} else {
 		job.Prompt = input.Prompt
 	}
