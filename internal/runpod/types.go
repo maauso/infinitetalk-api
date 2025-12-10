@@ -27,7 +27,7 @@ func (s Status) IsTerminal() bool {
 
 // SubmitOptions contains optional parameters for submitting a job to RunPod.
 type SubmitOptions struct {
-	Prompt      string // Prompt text for lip-sync (default: "A person talking naturally")
+	Prompt      string // Prompt text for lip-sync (default: "high quality, realistic, speaking naturally")
 	Width       int    // Video width in pixels (e.g., 384, 512)
 	Height      int    // Video height in pixels (e.g., 576, 512)
 	InputType   string // Input type (default: "image")
@@ -37,7 +37,7 @@ type SubmitOptions struct {
 // DefaultSubmitOptions returns the default options for submitting a job.
 func DefaultSubmitOptions() SubmitOptions {
 	return SubmitOptions{
-		Prompt:      "A person talking naturally",
+		Prompt:      "high quality, realistic, speaking naturally",
 		Width:       384,
 		Height:      576,
 		InputType:   "image",

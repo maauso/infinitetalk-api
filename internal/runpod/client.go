@@ -133,7 +133,7 @@ func (c *HTTPClient) Submit(ctx context.Context, imageB64, audioB64 string, opts
 		opts.PersonCount = "single"
 	}
 	if opts.Prompt == "" {
-		opts.Prompt = "A person talking naturally"
+		opts.Prompt = "high quality, realistic, speaking naturally"
 	}
 
 	reqBody := runRequest{

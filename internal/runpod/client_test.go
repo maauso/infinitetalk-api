@@ -48,8 +48,8 @@ func TestStatus_IsTerminal(t *testing.T) {
 func TestDefaultSubmitOptions(t *testing.T) {
 	opts := DefaultSubmitOptions()
 
-	if opts.Prompt != "A person talking naturally" {
-		t.Errorf("expected Prompt 'A person talking naturally', got %q", opts.Prompt)
+	if opts.Prompt != "high quality, realistic, speaking naturally" {
+		t.Errorf("expected Prompt 'high quality, realistic, speaking naturally', got %q", opts.Prompt)
 	}
 	if opts.Width == 0 {
 		t.Error("expected non-zero Width")
@@ -449,7 +449,7 @@ func TestSubmit_DefaultOptions(t *testing.T) {
 	if receivedReq.Input.PersonCount != "single" {
 		t.Errorf("expected default PersonCount 'single', got %q", receivedReq.Input.PersonCount)
 	}
-	if receivedReq.Input.Prompt != "A person talking naturally" {
-		t.Errorf("expected default Prompt 'A person talking naturally', got %q", receivedReq.Input.Prompt)
+	if receivedReq.Input.Prompt != "high quality, realistic, speaking naturally" {
+		t.Errorf("expected default Prompt 'high quality, realistic, speaking naturally', got %q", receivedReq.Input.Prompt)
 	}
 }
