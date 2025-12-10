@@ -82,15 +82,22 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		provider = "runpod"
 	}
 
+	// Default ForceOffload to true if not specified
+	forceOffload := true
+	if req.ForceOffload != nil {
+		forceOffload = *req.ForceOffload
+	}
+
 	// Create the job through the service
 	input := job.ProcessVideoInput{
-		ImageBase64: req.ImageBase64,
-		AudioBase64: req.AudioBase64,
-		Width:       req.Width,
-		Height:      req.Height,
-		Provider:    provider,
-		PushToS3:    req.PushToS3,
-		DryRun:      req.DryRun,
+		ImageBase64:  req.ImageBase64,
+		AudioBase64:  req.AudioBase64,
+		Width:        req.Width,
+		Height:       req.Height,
+		Provider:     provider,
+		PushToS3:     req.PushToS3,
+		DryRun:       req.DryRun,
+		ForceOffload: forceOffload,
 	}
 
 	// Create job first (synchronously)

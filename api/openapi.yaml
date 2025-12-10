@@ -153,6 +153,25 @@ components:
           type: boolean
           default: false
           description: Whether to upload the result to S3
+        dry_run:
+          type: boolean
+          default: false
+          description: Skip provider calls and complete after preprocessing (for testing)
+        provider:
+          type: string
+          enum:
+            - runpod
+            - beam
+          default: runpod
+          description: Video generation provider to use
+        force_offload:
+          type: boolean
+          default: true
+          description: |
+            Forces offload on the provider. When true, the provider will offload 
+            the model from GPU memory after processing. This is useful for resource 
+            management and cost optimization. Defaults to true if not specified.
+            Supported by both RunPod and Beam providers.
 
     CreateJobResponse:
       type: object
