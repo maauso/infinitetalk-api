@@ -35,14 +35,6 @@ func (m *mockProcessor) JoinVideos(ctx context.Context, videoPaths []string, out
 	return args.Error(0)
 }
 
-func (m *mockProcessor) ExtractLastFrame(ctx context.Context, videoPath string) ([]byte, error) {
-	args := m.Called(ctx, videoPath)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]byte), args.Error(1)
-}
-
 // mockSplitter implements audio.Splitter for testing
 type mockSplitter struct {
 	mock.Mock
@@ -692,9 +684,6 @@ func TestProcessVideoService_Process_MultipleChunks(t *testing.T) {
 		}).
 		Return(nil).Once()
 	processor.On("JoinVideos", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	// ExtractLastFrame is called for each chunk except the last one (3 chunks = 2 calls)
-	processor.On("ExtractLastFrame", mock.Anything, mock.AnythingOfType("string")).
-		Return([]byte("fake-frame-data"), nil).Times(2)
 
 	// Return 3 audio chunks
 	splitter.On("Split", mock.Anything, "/tmp/audio.wav", "/tmp", mock.Anything).
