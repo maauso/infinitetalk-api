@@ -23,6 +23,9 @@ type CreateJobRequest struct {
 	PushToS3 bool `json:"push_to_s3"`
 	// DryRun skips RunPod calls and completes after preprocessing.
 	DryRun bool `json:"dry_run"`
+	// ForceOffload forces offload on the provider. Defaults to true if not specified.
+	// Use a pointer to distinguish between explicit false and not provided.
+	ForceOffload *bool `json:"force_offload,omitempty"`
 }
 
 // CreateJobResponse is the HTTP response after creating a job.

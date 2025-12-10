@@ -61,6 +61,8 @@ type ProcessVideoInput struct {
 	PushToS3 bool
 	// DryRun skips RunPod calls and completes after preprocessing.
 	DryRun bool
+	// ForceOffload forces offload on the provider. Defaults to true if not specified.
+	ForceOffload bool
 }
 
 // ProcessVideoOutput contains the result of video processing.
@@ -401,7 +403,7 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 	}
 
 	// Step 5: Process chunks sequentially with frame continuity
-	videoPaths, err := s.processChunksSequential(ctx, job, gen, resizedImageB64, audioChunks, input.Width, input.Height)
+	videoPaths, err := s.processChunksSequential(ctx, job, gen, resizedImageB64, audioChunks, input.Width, input.Height, input.ForceOffload)
 	if err != nil {
 		s.logger.Error("failed to process chunks",
 			slog.String("job_id", job.ID),
@@ -500,6 +502,7 @@ func (s *ProcessVideoService) processChunksSequential(
 	initialImageB64 string,
 	audioChunks []string,
 	width, height int,
+	forceOffload bool,
 ) ([]string, error) {
 	videoPaths := make([]string, 0, len(audioChunks))
 
@@ -519,8 +522,9 @@ func (s *ProcessVideoService) processChunksSequential(
 
 		// Process this chunk with the original image
 		videoPath, err := s.processChunkWithGenerator(
-			ctx, job, gen, i, initialImageB64, chunkPath, width, height,
+			ctx, job, gen, i, initialImageB64, chunkPath, width, height, forceOffload,
 		)
+
 		if err != nil {
 			return nil, fmt.Errorf("chunk %d failed: %w", i, err)
 		}
@@ -548,6 +552,7 @@ func (s *ProcessVideoService) processChunkWithGenerator(
 	idx int,
 	imageB64, audioPath string,
 	width, height int,
+	forceOffload bool,
 ) (string, error) {
 	// Update chunk status to processing
 	s.updateChunkStatus(job, idx, ChunkStatusProcessing, "")
@@ -570,7 +575,7 @@ func (s *ProcessVideoService) processChunkWithGenerator(
 		Prompt:       job.Prompt,
 		Width:        width,
 		Height:       height,
-		ForceOffload: job.Provider == ProviderBeam, // Beam-specific option, ignored by RunPod
+		ForceOffload: forceOffload,
 	}
 	providerJobID, err := gen.Submit(ctx, imageB64, audioB64, submitOpts)
 	if err != nil {

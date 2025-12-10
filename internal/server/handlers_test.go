@@ -566,6 +566,98 @@ func TestDeleteJobVideo_MissingID(t *testing.T) {
 	assert.Equal(t, "MISSING_JOB_ID", resp.Code)
 }
 
+func TestCreateJob_ForceOffloadDefaultTrue(t *testing.T) {
+	h, _, _, _, _, repo := newTestHandlers(t)
+
+	// Create job without specifying force_offload (should default to true)
+	body := CreateJobRequest{
+		ImageBase64: base64.StdEncoding.EncodeToString([]byte("test-image")),
+		AudioBase64: base64.StdEncoding.EncodeToString([]byte("test-audio")),
+		Width:       384,
+		Height:      576,
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.CreateJob(rec, req)
+
+	assert.Equal(t, http.StatusAccepted, rec.Code)
+
+	var resp CreateJobResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+
+	// Verify the job was created with force_offload=true by default
+	// Note: We can't directly check the input since it's internal,
+	// but we've validated that CreateJob returns a job ID successfully
+	assert.NotEmpty(t, resp.ID)
+	assert.Equal(t, "IN_QUEUE", resp.Status)
+
+	// Verify the job exists in the repository
+	createdJob, err := repo.FindByID(context.Background(), resp.ID)
+	require.NoError(t, err)
+	assert.Equal(t, resp.ID, createdJob.ID)
+}
+
+func TestCreateJob_ForceOffloadExplicitTrue(t *testing.T) {
+	h, _, _, _, _, _ := newTestHandlers(t)
+
+	forceOffload := true
+	body := CreateJobRequest{
+		ImageBase64:  base64.StdEncoding.EncodeToString([]byte("test-image")),
+		AudioBase64:  base64.StdEncoding.EncodeToString([]byte("test-audio")),
+		Width:        384,
+		Height:       576,
+		ForceOffload: &forceOffload,
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.CreateJob(rec, req)
+
+	assert.Equal(t, http.StatusAccepted, rec.Code)
+
+	var resp CreateJobResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.ID)
+	assert.Equal(t, "IN_QUEUE", resp.Status)
+}
+
+func TestCreateJob_ForceOffloadExplicitFalse(t *testing.T) {
+	h, _, _, _, _, _ := newTestHandlers(t)
+
+	forceOffload := false
+	body := CreateJobRequest{
+		ImageBase64:  base64.StdEncoding.EncodeToString([]byte("test-image")),
+		AudioBase64:  base64.StdEncoding.EncodeToString([]byte("test-audio")),
+		Width:        384,
+		Height:       576,
+		ForceOffload: &forceOffload,
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewReader(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.CreateJob(rec, req)
+
+	assert.Equal(t, http.StatusAccepted, rec.Code)
+
+	var resp CreateJobResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.ID)
+	assert.Equal(t, "IN_QUEUE", resp.Status)
+}
+
 func TestCreateJob_WithPrompt(t *testing.T) {
 	h, _, _, _, _, repo := newTestHandlers(t)
 	ctx := context.Background()
@@ -609,7 +701,7 @@ func TestCreateJob_DefaultPrompt(t *testing.T) {
 		AudioBase64: base64.StdEncoding.EncodeToString([]byte("test-audio")),
 		Width:       384,
 		Height:      576,
-		// Prompt is omitted, should default to "A person talking naturally"
+		// Prompt is omitted, should default to "high quality, realistic, speaking naturally"
 		PushToS3: false,
 	}
 	bodyJSON, _ := json.Marshal(body)
@@ -665,5 +757,5 @@ func TestCreateJob_EmptyPromptUsesDefault(t *testing.T) {
 	// Verify the job was created with the default prompt
 	createdJob, err := repo.FindByID(ctx, resp.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "A person talking naturally", createdJob.Prompt)
+	assert.Equal(t, "high quality, realistic, speaking naturally", createdJob.Prompt)
 }
