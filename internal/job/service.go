@@ -53,6 +53,8 @@ type ProcessVideoInput struct {
 	Width int
 	// Height is the target video height.
 	Height int
+	// Prompt is the text prompt for video generation.
+	Prompt string
 	// Provider is the video generation provider ("runpod" or "beam").
 	Provider string
 	// PushToS3 indicates whether to upload the final video to S3.
@@ -171,6 +173,13 @@ func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoI
 	job.Height = input.Height
 	job.PushToS3 = input.PushToS3
 
+	// Set prompt (default to "A person talking naturally" if not provided)
+	if input.Prompt == "" {
+		job.Prompt = "high quality, realistic, speaking naturally"
+	} else {
+		job.Prompt = input.Prompt
+	}
+
 	// Set provider (default to runpod if empty)
 	if input.Provider == "" {
 		job.Provider = ProviderRunPod
@@ -186,6 +195,7 @@ func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoI
 	s.logger.Info("creating new job",
 		slog.String("job_id", job.ID),
 		slog.String("provider", string(job.Provider)),
+		slog.String("prompt", job.Prompt),
 		slog.Int("width", input.Width),
 		slog.Int("height", input.Height),
 		slog.Bool("push_to_s3", input.PushToS3),
@@ -562,7 +572,7 @@ func (s *ProcessVideoService) processChunkWithGenerator(
 
 	// Submit using generator interface
 	submitOpts := generator.SubmitOptions{
-		Prompt:       "", // Use default prompt from provider
+		Prompt:       job.Prompt,
 		Width:        width,
 		Height:       height,
 		ForceOffload: forceOffload,
