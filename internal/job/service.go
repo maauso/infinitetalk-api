@@ -199,6 +199,7 @@ func (s *ProcessVideoService) CreateJob(ctx context.Context, input ProcessVideoI
 		slog.Int("width", input.Width),
 		slog.Int("height", input.Height),
 		slog.Bool("push_to_s3", input.PushToS3),
+		slog.Bool("force_offload", input.ForceOffload),
 	)
 
 	if err := s.repo.Save(ctx, job); err != nil {
@@ -561,6 +562,7 @@ func (s *ProcessVideoService) processChunkWithGenerator(
 		slog.String("job_id", job.ID),
 		slog.String("provider", string(job.Provider)),
 		slog.Int("chunk_index", idx),
+		slog.Bool("force_offload", forceOffload),
 	)
 
 	// Read audio as base64

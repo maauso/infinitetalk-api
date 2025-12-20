@@ -124,17 +124,12 @@ func NewClient(queueURL string, opts ...ClientOption) (*HTTPClient, error) {
 // Submit sends a lip-sync task to Beam and returns the task ID.
 func (c *HTTPClient) Submit(ctx context.Context, imageB64, audioB64 string, opts SubmitOptions) (string, error) {
 	reqBody := taskRequest{
-		Prompt:      opts.Prompt,
-		Width:       opts.Width,
-		Height:      opts.Height,
-		ImageBase64: imageB64,
-		WavBase64:   audioB64,
-	}
-
-	// Only include force_offload if explicitly set
-	if opts.ForceOffload {
-		val := opts.ForceOffload
-		reqBody.ForceOffload = &val
+		Prompt:       opts.Prompt,
+		Width:        opts.Width,
+		Height:       opts.Height,
+		ImageBase64:  imageB64,
+		WavBase64:    audioB64,
+		ForceOffload: &opts.ForceOffload,
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
