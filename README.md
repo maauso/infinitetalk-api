@@ -101,7 +101,8 @@ curl -X POST http://localhost:8080/jobs \
     "height": 576,
     "provider": "runpod",
     "push_to_s3": false,
-    "dry_run": false
+    "dry_run": false,
+    "force_offload": false
   }'
 ```
 
@@ -117,7 +118,8 @@ curl -X POST http://localhost:8080/jobs \
     "height": 540,
     "provider": "beam",
     "push_to_s3": false,
-    "dry_run": false
+    "dry_run": false,
+    "force_offload": false
   }'
 ```
 
@@ -135,6 +137,8 @@ Response (`202 Accepted`):
 ```
 
 **Dry-Run Mode:** Set `"dry_run": true` to execute preprocessing (decode, resize, split) without calling the provider. Useful for testing and validation. The job completes immediately after audio splitting.
+
+**Force Offload:** The `"force_offload"` parameter controls whether model components are offloaded to CPU during inference. Set to `false` for ~1.5x faster processing on high-VRAM GPUs (24GB+). Default is `true` to prevent out-of-memory errors on smaller GPUs.
 
 ### Poll Job Status
 
