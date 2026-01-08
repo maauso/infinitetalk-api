@@ -176,6 +176,8 @@ func (c *HTTPClient) Poll(ctx context.Context, taskID string) (PollResult, error
 		mapped = StatusCompleted
 	case "FAILED":
 		mapped = StatusFailed
+	case "ERROR":
+		mapped = StatusError
 	case "CANCELED":
 		mapped = StatusCanceled
 	default:
@@ -194,7 +196,7 @@ func (c *HTTPClient) Poll(ctx context.Context, taskID string) (PollResult, error
 		} else {
 			result.Error = "no output URL available"
 		}
-	case StatusFailed:
+	case StatusFailed, StatusError:
 		result.Error = resp.Error
 	}
 

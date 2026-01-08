@@ -125,6 +125,7 @@ func TestHTTPClient_Poll(t *testing.T) {
 		{"completed", "COMPLETED", StatusCompleted, true},
 		{"complete", "COMPLETE", StatusCompleted, true},
 		{"failed", "FAILED", StatusFailed, false},
+		{"error", "ERROR", StatusError, false},
 		{"canceled", "CANCELED", StatusCanceled, false},
 	}
 
@@ -143,7 +144,7 @@ func TestHTTPClient_Poll(t *testing.T) {
 						{Name: "output.mp4", URL: "https://example.com/video.mp4"},
 					}
 				}
-				if tt.expectedStatus == StatusFailed {
+				if tt.expectedStatus == StatusFailed || tt.expectedStatus == StatusError {
 					resp.Error = "processing error"
 				}
 
@@ -175,7 +176,7 @@ func TestHTTPClient_Poll(t *testing.T) {
 						{Name: "output.mp4", URL: "https://example.com/video.mp4"},
 					}
 				}
-				if tt.expectedStatus == StatusFailed {
+				if tt.expectedStatus == StatusFailed || tt.expectedStatus == StatusError {
 					resp.Error = "processing error"
 				}
 
@@ -186,7 +187,7 @@ func TestHTTPClient_Poll(t *testing.T) {
 			// Create a custom client that overrides the poll URL construction
 			ctx := context.Background()
 			var result PollResult
-			
+
 			// Manually call doRequest to bypass URL construction
 			var resp statusResponse
 			err := client.doRequest(ctx, http.MethodGet, server2.URL, nil, &resp)
@@ -203,6 +204,8 @@ func TestHTTPClient_Poll(t *testing.T) {
 				mapped = StatusCompleted
 			case "FAILED":
 				mapped = StatusFailed
+			case "ERROR":
+				mapped = StatusError
 			case "CANCELED":
 				mapped = StatusCanceled
 			}
@@ -213,7 +216,7 @@ func TestHTTPClient_Poll(t *testing.T) {
 					result.OutputURL = resp.Outputs[0].URL
 				}
 			}
-			if mapped == StatusFailed {
+			if mapped == StatusFailed || mapped == StatusError {
 				result.Error = resp.Error
 			}
 
@@ -221,7 +224,7 @@ func TestHTTPClient_Poll(t *testing.T) {
 			if tt.hasOutput {
 				assert.NotEmpty(t, result.OutputURL)
 			}
-			if tt.expectedStatus == StatusFailed {
+			if tt.expectedStatus == StatusFailed || tt.expectedStatus == StatusError {
 				assert.NotEmpty(t, result.Error)
 			}
 
@@ -276,6 +279,7 @@ func TestStatus_IsTerminal(t *testing.T) {
 		{"completed is terminal", StatusCompleted, true},
 		{"complete is terminal", StatusComplete, true},
 		{"failed is terminal", StatusFailed, true},
+		{"error is terminal", StatusError, true},
 		{"canceled is terminal", StatusCanceled, true},
 	}
 

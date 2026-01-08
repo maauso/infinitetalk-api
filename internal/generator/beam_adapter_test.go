@@ -82,6 +82,7 @@ func TestBeamAdapter_Poll(t *testing.T) {
 		{"completed", beam.StatusCompleted, StatusCompleted, "https://example.com/video.mp4"},
 		{"complete", beam.StatusComplete, StatusCompleted, "https://example.com/video.mp4"},
 		{"failed", beam.StatusFailed, StatusFailed, ""},
+		{"error", beam.StatusError, StatusFailed, ""},
 		{"canceled", beam.StatusCanceled, StatusCancelled, ""},
 	}
 

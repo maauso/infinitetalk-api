@@ -48,7 +48,7 @@ func (a *BeamAdapter) Poll(ctx context.Context, taskID string) (PollResult, erro
 		status = StatusRunning
 	case beam.StatusCompleted, beam.StatusComplete:
 		status = StatusCompleted
-	case beam.StatusFailed:
+	case beam.StatusFailed, beam.StatusError:
 		status = StatusFailed
 	case beam.StatusCanceled:
 		status = StatusCancelled
