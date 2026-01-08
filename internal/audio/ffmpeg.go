@@ -397,14 +397,15 @@ func (s *FFmpegSplitter) extractSegmentWithArgs(ctx context.Context, inputPath, 
 	// Build args: -y -i input -ss start -to end -vn -acodec pcm_s16le [extraArgs] output
 	// Place -ss after -i for precise seeking
 	endTime := start + duration
-	args := []string{
+	args := make([]string, 0, 10+len(extraArgs)+1)
+	args = append(args,
 		"-y", // Overwrite output
 		"-i", inputPath,
 		"-ss", fmt.Sprintf("%.3f", start),
 		"-to", fmt.Sprintf("%.3f", endTime),
-		"-vn",                // No video
+		"-vn",                   // No video
 		"-acodec", codecPCM16LE, // Force PCM 16-bit little-endian
-	}
+	)
 
 	// Add extra arguments (e.g., normalization)
 	args = append(args, extraArgs...)
@@ -468,12 +469,13 @@ func (s *FFmpegSplitter) copyAudio(ctx context.Context, src, dst string) error {
 
 // copyAudioWithArgs copies audio with optional extra arguments.
 func (s *FFmpegSplitter) copyAudioWithArgs(ctx context.Context, src, dst string, extraArgs []string) error {
-	args := []string{
+	args := make([]string, 0, 6+len(extraArgs)+1)
+	args = append(args,
 		"-y",
 		"-i", src,
-		"-vn",                // No video
+		"-vn",                   // No video
 		"-acodec", codecPCM16LE, // Force PCM 16-bit little-endian
-	}
+	)
 
 	// Add extra arguments (e.g., normalization)
 	args = append(args, extraArgs...)
