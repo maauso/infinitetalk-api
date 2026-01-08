@@ -11,13 +11,14 @@ const (
 	StatusCompleted Status = "COMPLETED"
 	StatusComplete  Status = "COMPLETE" // Beam sometimes returns "COMPLETE" instead of "COMPLETED"
 	StatusFailed    Status = "FAILED"
+	StatusError     Status = "ERROR"    // Beam returns "ERROR" when a task fails
 	StatusCanceled  Status = "CANCELED" // Beam uses "CANCELED" (American spelling)
 )
 
 // IsTerminal returns true if the status is a terminal state.
 func (s Status) IsTerminal() bool {
 	switch s {
-	case StatusCompleted, StatusComplete, StatusFailed, StatusCanceled:
+	case StatusCompleted, StatusComplete, StatusFailed, StatusError, StatusCanceled:
 		return true
 	default:
 		return false
@@ -63,10 +64,10 @@ type taskResponse struct {
 
 // statusResponse represents the response from Beam's task status endpoint.
 type statusResponse struct {
-	TaskID  string        `json:"task_id"`
-	Status  string        `json:"status"`
-	Outputs []taskOutput  `json:"outputs,omitempty"`
-	Error   string        `json:"error,omitempty"`
+	TaskID  string       `json:"task_id"`
+	Status  string       `json:"status"`
+	Outputs []taskOutput `json:"outputs,omitempty"`
+	Error   string       `json:"error,omitempty"`
 }
 
 // taskOutput represents a single output file from a Beam task.
