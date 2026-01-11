@@ -17,6 +17,12 @@ var (
 	ErrInvalidDimensions = errors.New("invalid dimensions: width and height must be positive")
 	// ErrNoVideoPaths is returned when no video paths are provided for joining.
 	ErrNoVideoPaths = errors.New("no video paths provided")
+	// ErrInvalidDuration is returned when duration is not positive.
+	ErrInvalidDuration = errors.New("invalid duration: must be positive")
+	// ErrFFprobeExecution is returned when ffprobe command fails.
+	ErrFFprobeExecution = errors.New("ffprobe execution failed")
+	// ErrProcessorRequired is returned when media processor is required but not set.
+	ErrProcessorRequired = errors.New("V2V mode requires media processor")
 )
 
 // FFmpegProcessor implements Processor using the ffmpeg CLI.
@@ -216,7 +222,7 @@ func (p *FFmpegProcessor) GetMediaDuration(ctx context.Context, path string) (fl
 		if ctx.Err() != nil {
 			return 0, fmt.Errorf("ffprobe cancelled: %w", ctx.Err())
 		}
-		return 0, fmt.Errorf("ffprobe error: %v\nstderr: %s", err, stderr.String())
+		return 0, fmt.Errorf("%w: %w, stderr: %s", ErrFFprobeExecution, err, stderr.String())
 	}
 
 	var duration float64
@@ -232,7 +238,7 @@ func (p *FFmpegProcessor) GetMediaDuration(ctx context.Context, path string) (fl
 // Implements the visual behavior from the reference Python script using FFmpeg's zoompan filter.
 func (p *FFmpegProcessor) GenerateMovingVideo(ctx context.Context, imagePath, outputPath string, duration float64, width, height int) error {
 	if duration <= 0 {
-		return fmt.Errorf("invalid duration: must be positive, got %.2f", duration)
+		return fmt.Errorf("%w: got %.2f", ErrInvalidDuration, duration)
 	}
 	if width <= 0 || height <= 0 {
 		return fmt.Errorf("%w: width=%d, height=%d", ErrInvalidDimensions, width, height)
@@ -240,12 +246,7 @@ func (p *FFmpegProcessor) GenerateMovingVideo(ctx context.Context, imagePath, ou
 
 	// Calculate parameters for zoompan filter
 	// fps=25 means 25 frames per second
-	// totalFrames = duration * fps
 	fps := 25
-	totalFrames := int(duration * float64(fps))
-	if totalFrames == 0 {
-		totalFrames = 1 // Minimum 1 frame
-	}
 
 	// Zoompan filter creates a smooth zoom effect
 	// z='min(zoom+0.0015,1.5)': gradual zoom from 1x to 1.5x over the video
@@ -257,7 +258,7 @@ func (p *FFmpegProcessor) GenerateMovingVideo(ctx context.Context, imagePath, ou
 	// - Starts at zoom level 1 (no zoom)
 	// - Gradually zooms in by calculating zoom based on frame number
 	// - x and y center the zoomed area
-	filter := fmt.Sprintf("zoompan=z='min(zoom+0.0015,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=%dx%d:fps=25,format=yuv420p", width, height)
+	filter := fmt.Sprintf("zoompan=z='min(zoom+0.0015,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=%dx%d:fps=%d,format=yuv420p", width, height, fps)
 
 	args := []string{
 		"-loop", "1", // Loop the input image

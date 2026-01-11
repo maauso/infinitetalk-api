@@ -3,12 +3,19 @@ package generator
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/maauso/infinitetalk-api/internal/beam"
 	"github.com/maauso/infinitetalk-api/internal/media"
+)
+
+// Static errors for beam adapter.
+var (
+	// ErrProcessorRequired is returned when V2V mode is enabled but processor is not set.
+	ErrProcessorRequired = errors.New("V2V mode requires media processor")
 )
 
 // BeamAdapter adapts the Beam client to the Generator interface.
@@ -52,7 +59,7 @@ func (a *BeamAdapter) Submit(ctx context.Context, imageB64, audioB64 string, opt
 
 	// V2V mode: generate intermediate video
 	if a.processor == nil {
-		return "", fmt.Errorf("V2V mode requires media processor")
+		return "", ErrProcessorRequired
 	}
 
 	// Create temp directory for processing
@@ -126,7 +133,11 @@ func (a *BeamAdapter) Submit(ctx context.Context, imageB64, audioB64 string, opt
 // submitV2V submits a V2V task to Beam.
 // This is an internal method that directly constructs the V2V payload.
 func (a *BeamAdapter) submitV2V(ctx context.Context, videoB64, audioB64 string, opts beam.SubmitOptions) (string, error) {
-	return a.client.SubmitV2V(ctx, videoB64, audioB64, opts)
+	taskID, err := a.client.SubmitV2V(ctx, videoB64, audioB64, opts)
+	if err != nil {
+		return "", fmt.Errorf("submit v2v to beam: %w", err)
+	}
+	return taskID, nil
 }
 
 // Poll checks the status of a Beam task.
