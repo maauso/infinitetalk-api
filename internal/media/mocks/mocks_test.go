@@ -37,6 +37,153 @@ func (_m *MockProcessor) EXPECT() *MockProcessor_Expecter {
 	return &MockProcessor_Expecter{mock: &_m.Mock}
 }
 
+// GenerateMovingVideo provides a mock function for the type MockProcessor
+func (_mock *MockProcessor) GenerateMovingVideo(ctx context.Context, imagePath string, outputPath string, duration float64, width int, height int) error {
+	ret := _mock.Called(ctx, imagePath, outputPath, duration, width, height)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenerateMovingVideo")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, float64, int, int) error); ok {
+		r0 = returnFunc(ctx, imagePath, outputPath, duration, width, height)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockProcessor_GenerateMovingVideo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateMovingVideo'
+type MockProcessor_GenerateMovingVideo_Call struct {
+	*mock.Call
+}
+
+// GenerateMovingVideo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - imagePath string
+//   - outputPath string
+//   - duration float64
+//   - width int
+//   - height int
+func (_e *MockProcessor_Expecter) GenerateMovingVideo(ctx interface{}, imagePath interface{}, outputPath interface{}, duration interface{}, width interface{}, height interface{}) *MockProcessor_GenerateMovingVideo_Call {
+	return &MockProcessor_GenerateMovingVideo_Call{Call: _e.mock.On("GenerateMovingVideo", ctx, imagePath, outputPath, duration, width, height)}
+}
+
+func (_c *MockProcessor_GenerateMovingVideo_Call) Run(run func(ctx context.Context, imagePath string, outputPath string, duration float64, width int, height int)) *MockProcessor_GenerateMovingVideo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 float64
+		if args[3] != nil {
+			arg3 = args[3].(float64)
+		}
+		var arg4 int
+		if args[4] != nil {
+			arg4 = args[4].(int)
+		}
+		var arg5 int
+		if args[5] != nil {
+			arg5 = args[5].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *MockProcessor_GenerateMovingVideo_Call) Return(err error) *MockProcessor_GenerateMovingVideo_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockProcessor_GenerateMovingVideo_Call) RunAndReturn(run func(ctx context.Context, imagePath string, outputPath string, duration float64, width int, height int) error) *MockProcessor_GenerateMovingVideo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetMediaDuration provides a mock function for the type MockProcessor
+func (_mock *MockProcessor) GetMediaDuration(ctx context.Context, path string) (float64, error) {
+	ret := _mock.Called(ctx, path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMediaDuration")
+	}
+
+	var r0 float64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (float64, error)); ok {
+		return returnFunc(ctx, path)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) float64); ok {
+		r0 = returnFunc(ctx, path)
+	} else {
+		r0 = ret.Get(0).(float64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, path)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockProcessor_GetMediaDuration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMediaDuration'
+type MockProcessor_GetMediaDuration_Call struct {
+	*mock.Call
+}
+
+// GetMediaDuration is a helper method to define mock.On call
+//   - ctx context.Context
+//   - path string
+func (_e *MockProcessor_Expecter) GetMediaDuration(ctx interface{}, path interface{}) *MockProcessor_GetMediaDuration_Call {
+	return &MockProcessor_GetMediaDuration_Call{Call: _e.mock.On("GetMediaDuration", ctx, path)}
+}
+
+func (_c *MockProcessor_GetMediaDuration_Call) Run(run func(ctx context.Context, path string)) *MockProcessor_GetMediaDuration_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockProcessor_GetMediaDuration_Call) Return(f float64, err error) *MockProcessor_GetMediaDuration_Call {
+	_c.Call.Return(f, err)
+	return _c
+}
+
+func (_c *MockProcessor_GetMediaDuration_Call) RunAndReturn(run func(ctx context.Context, path string) (float64, error)) *MockProcessor_GetMediaDuration_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // JoinVideos provides a mock function for the type MockProcessor
 func (_mock *MockProcessor) JoinVideos(ctx context.Context, videoPaths []string, output string) error {
 	ret := _mock.Called(ctx, videoPaths, output)

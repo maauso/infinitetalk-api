@@ -99,6 +99,7 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		PushToS3:     req.PushToS3,
 		DryRun:       req.DryRun,
 		ForceOffload: forceOffload,
+		LongVideo:    req.LongVideo,
 	}
 
 	// Create job first (synchronously)

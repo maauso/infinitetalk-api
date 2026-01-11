@@ -172,6 +172,14 @@ components:
             the model from GPU memory after processing. This is useful for resource 
             management and cost optimization. Defaults to true if not specified.
             Supported by both RunPod and Beam providers.
+        long_video:
+          type: boolean
+          default: false
+          description: |
+            Enable V2V (Video-to-Video) mode for long-duration videos on Beam.cloud.
+            When true, generates an intermediate video with motion from the input image
+            to prevent visual degradation in videos longer than ~1 minute. Only supported
+            by the Beam provider.
 
     CreateJobResponse:
       type: object

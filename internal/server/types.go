@@ -26,6 +26,9 @@ type CreateJobRequest struct {
 	// ForceOffload forces offload on the provider. Defaults to true if not specified.
 	// Use a pointer to distinguish between explicit false and not provided.
 	ForceOffload *bool `json:"force_offload,omitempty"`
+	// LongVideo enables V2V (Video-to-Video) mode for long-duration videos.
+	// Only supported by the Beam provider.
+	LongVideo bool `json:"long_video"`
 }
 
 // CreateJobResponse is the HTTP response after creating a job.

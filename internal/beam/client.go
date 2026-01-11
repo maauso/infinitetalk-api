@@ -41,6 +41,9 @@ type Client interface {
 	// Submit sends a lip-sync task to Beam and returns the task ID.
 	Submit(ctx context.Context, imageB64, audioB64 string, opts SubmitOptions) (taskID string, err error)
 
+	// SubmitV2V sends a V2V (Video-to-Video) lip-sync task to Beam and returns the task ID.
+	SubmitV2V(ctx context.Context, videoB64, audioB64 string, opts SubmitOptions) (taskID string, err error)
+
 	// Poll checks the status of a task and returns the result.
 	Poll(ctx context.Context, taskID string) (PollResult, error)
 
@@ -124,6 +127,7 @@ func NewClient(queueURL string, opts ...ClientOption) (*HTTPClient, error) {
 // Submit sends a lip-sync task to Beam and returns the task ID.
 func (c *HTTPClient) Submit(ctx context.Context, imageB64, audioB64 string, opts SubmitOptions) (string, error) {
 	reqBody := taskRequest{
+		InputType:    "image",
 		Prompt:       opts.Prompt,
 		Width:        opts.Width,
 		Height:       opts.Height,
@@ -135,6 +139,44 @@ func (c *HTTPClient) Submit(ctx context.Context, imageB64, audioB64 string, opts
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		return "", fmt.Errorf("beam: marshal request: %w", err)
+	}
+
+	var resp taskResponse
+	if err := c.doRequestWithRetry(ctx, http.MethodPost, c.queueURL, bodyBytes, &resp); err != nil {
+		return "", err
+	}
+
+	if resp.TaskID == "" {
+		if resp.Error != "" {
+			return "", fmt.Errorf("%w: %s", ErrSubmitFailed, resp.Error)
+		}
+		return "", ErrNoTaskIDReturned
+	}
+
+	return resp.TaskID, nil
+}
+
+// SubmitV2V sends a V2V (Video-to-Video) lip-sync task to Beam and returns the task ID.
+func (c *HTTPClient) SubmitV2V(ctx context.Context, videoB64, audioB64 string, opts SubmitOptions) (string, error) {
+	maxFrame := opts.MaxFrame
+	if maxFrame == 0 {
+		maxFrame = 1000 // Default as per requirements
+	}
+
+	reqBody := taskRequest{
+		InputType:    "video",
+		Prompt:       opts.Prompt,
+		Width:        opts.Width,
+		Height:       opts.Height,
+		MaxFrame:     maxFrame,
+		VideoBase64:  videoB64,
+		WavBase64:    audioB64,
+		ForceOffload: &opts.ForceOffload,
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("beam: marshal v2v request: %w", err)
 	}
 
 	var resp taskResponse

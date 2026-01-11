@@ -21,6 +21,11 @@ func (m *mockBeamClient) Submit(ctx context.Context, imageB64, audioB64 string, 
 	return args.String(0), args.Error(1)
 }
 
+func (m *mockBeamClient) SubmitV2V(ctx context.Context, videoB64, audioB64 string, opts beam.SubmitOptions) (string, error) {
+	args := m.Called(ctx, videoB64, audioB64, opts)
+	return args.String(0), args.Error(1)
+}
+
 func (m *mockBeamClient) Poll(ctx context.Context, taskID string) (beam.PollResult, error) {
 	args := m.Called(ctx, taskID)
 	return args.Get(0).(beam.PollResult), args.Error(1)
