@@ -392,3 +392,151 @@ func getVideoDuration(t *testing.T, path string) float64 {
 
 	return duration
 }
+
+func TestGetMediaDuration(t *testing.T) {
+	skipIfNoFFmpeg(t)
+
+	tmpDir := t.TempDir()
+	p := NewFFmpegProcessor("")
+
+	t.Run("get audio duration", func(t *testing.T) {
+		audioPath := filepath.Join(tmpDir, "audio.wav")
+		// Create a 2.5 second audio file
+		cmd := exec.Command("ffmpeg",
+			"-y",
+			"-f", "lavfi",
+			"-i", "anullsrc=r=44100:cl=mono:d=2.5",
+			"-c:a", "pcm_s16le",
+			audioPath,
+		)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("failed to create test audio: %v\noutput: %s", err, output)
+		}
+
+		ctx := context.Background()
+		duration, err := p.GetMediaDuration(ctx, audioPath)
+		if err != nil {
+			t.Fatalf("GetMediaDuration failed: %v", err)
+		}
+
+		// Check duration is approximately 2.5 seconds (allow some tolerance)
+		if duration < 2.4 || duration > 2.6 {
+			t.Errorf("expected duration ~2.5s, got %.2f", duration)
+		}
+	})
+
+	t.Run("get video duration", func(t *testing.T) {
+		videoPath := filepath.Join(tmpDir, "video.mp4")
+		createTestVideo(t, videoPath, 1.5, "blue")
+
+		ctx := context.Background()
+		duration, err := p.GetMediaDuration(ctx, videoPath)
+		if err != nil {
+			t.Fatalf("GetMediaDuration failed: %v", err)
+		}
+
+		// Check duration is approximately 1.5 seconds
+		if duration < 1.4 || duration > 1.6 {
+			t.Errorf("expected duration ~1.5s, got %.2f", duration)
+		}
+	})
+
+	t.Run("nonexistent file", func(t *testing.T) {
+		ctx := context.Background()
+		_, err := p.GetMediaDuration(ctx, "/nonexistent/path.wav")
+		if err == nil {
+			t.Error("expected error for nonexistent file, got nil")
+		}
+	})
+}
+
+func TestGenerateMovingVideo(t *testing.T) {
+	skipIfNoFFmpeg(t)
+
+	tmpDir := t.TempDir()
+	p := NewFFmpegProcessor("")
+
+	t.Run("generate video with correct duration", func(t *testing.T) {
+		imagePath := filepath.Join(tmpDir, "image.png")
+		videoPath := filepath.Join(tmpDir, "moving_video.mp4")
+
+		// Create a test image
+		createTestImage(t, imagePath, 384, 384)
+
+		ctx := context.Background()
+		duration := 3.0
+		err := p.GenerateMovingVideo(ctx, imagePath, videoPath, duration, 384, 384)
+		if err != nil {
+			t.Fatalf("GenerateMovingVideo failed: %v", err)
+		}
+
+		// Verify output exists
+		if _, err := os.Stat(videoPath); os.IsNotExist(err) {
+			t.Error("output video was not created")
+		}
+
+		// Verify duration matches requested duration
+		actualDuration := getVideoDuration(t, videoPath)
+		// Allow 0.2 second tolerance for encoding
+		if actualDuration < duration-0.2 || actualDuration > duration+0.2 {
+			t.Errorf("expected duration ~%.1fs, got %.2f", duration, actualDuration)
+		}
+	})
+
+	t.Run("generate short video", func(t *testing.T) {
+		imagePath := filepath.Join(tmpDir, "image2.png")
+		videoPath := filepath.Join(tmpDir, "short_video.mp4")
+
+		createTestImage(t, imagePath, 512, 512)
+
+		ctx := context.Background()
+		duration := 0.5
+		err := p.GenerateMovingVideo(ctx, imagePath, videoPath, duration, 512, 512)
+		if err != nil {
+			t.Fatalf("GenerateMovingVideo failed: %v", err)
+		}
+
+		// Verify output exists and has correct duration
+		actualDuration := getVideoDuration(t, videoPath)
+		if actualDuration < 0.4 || actualDuration > 0.6 {
+			t.Errorf("expected duration ~%.1fs, got %.2f", duration, actualDuration)
+		}
+	})
+
+	t.Run("invalid duration", func(t *testing.T) {
+		imagePath := filepath.Join(tmpDir, "image3.png")
+		videoPath := filepath.Join(tmpDir, "invalid.mp4")
+
+		createTestImage(t, imagePath, 384, 384)
+
+		ctx := context.Background()
+		err := p.GenerateMovingVideo(ctx, imagePath, videoPath, -1.0, 384, 384)
+		if err == nil {
+			t.Error("expected error for negative duration, got nil")
+		}
+	})
+
+	t.Run("invalid dimensions", func(t *testing.T) {
+		imagePath := filepath.Join(tmpDir, "image4.png")
+		videoPath := filepath.Join(tmpDir, "invalid2.mp4")
+
+		createTestImage(t, imagePath, 384, 384)
+
+		ctx := context.Background()
+		err := p.GenerateMovingVideo(ctx, imagePath, videoPath, 1.0, 0, 384)
+		if err == nil {
+			t.Error("expected error for invalid dimensions, got nil")
+		}
+	})
+
+	t.Run("nonexistent image", func(t *testing.T) {
+		videoPath := filepath.Join(tmpDir, "nonexistent.mp4")
+
+		ctx := context.Background()
+		err := p.GenerateMovingVideo(ctx, "/nonexistent/image.png", videoPath, 1.0, 384, 384)
+		if err == nil {
+			t.Error("expected error for nonexistent image, got nil")
+		}
+	})
+}
+

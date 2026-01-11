@@ -17,6 +17,12 @@ var (
 	ErrInvalidDimensions = errors.New("invalid dimensions: width and height must be positive")
 	// ErrNoVideoPaths is returned when no video paths are provided for joining.
 	ErrNoVideoPaths = errors.New("no video paths provided")
+	// ErrInvalidDuration is returned when duration is not positive.
+	ErrInvalidDuration = errors.New("invalid duration: must be positive")
+	// ErrFFprobeExecution is returned when ffprobe command fails.
+	ErrFFprobeExecution = errors.New("ffprobe execution failed")
+	// ErrProcessorRequired is returned when media processor is required but not set.
+	ErrProcessorRequired = errors.New("V2V mode requires media processor")
 )
 
 // FFmpegProcessor implements Processor using the ffmpeg CLI.
@@ -193,3 +199,79 @@ func (e *FFmpegError) Error() string {
 func (e *FFmpegError) Unwrap() error {
 	return e.Err
 }
+
+// GetMediaDuration returns the duration in seconds of a media file.
+// It uses ffprobe to extract the duration metadata.
+func (p *FFmpegProcessor) GetMediaDuration(ctx context.Context, path string) (float64, error) {
+	// Use ffprobe to get duration in seconds
+	// #nosec G204 - ffmpegPath is set by the application, not user input
+	cmd := exec.CommandContext(ctx, "ffprobe",
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		path,
+	)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if ctx.Err() != nil {
+			return 0, fmt.Errorf("ffprobe cancelled: %w", ctx.Err())
+		}
+		return 0, fmt.Errorf("%w: %w, stderr: %s", ErrFFprobeExecution, err, stderr.String())
+	}
+
+	var duration float64
+	_, err = fmt.Sscanf(strings.TrimSpace(stdout.String()), "%f", &duration)
+	if err != nil {
+		return 0, fmt.Errorf("parse duration: %w", err)
+	}
+
+	return duration, nil
+}
+
+// GenerateMovingVideo creates a video from a static image with zoom/pan motion.
+// Implements the visual behavior from the reference Python script using FFmpeg's zoompan filter.
+func (p *FFmpegProcessor) GenerateMovingVideo(ctx context.Context, imagePath, outputPath string, duration float64, width, height int) error {
+	if duration <= 0 {
+		return fmt.Errorf("%w: got %.2f", ErrInvalidDuration, duration)
+	}
+	if width <= 0 || height <= 0 {
+		return fmt.Errorf("%w: width=%d, height=%d", ErrInvalidDimensions, width, height)
+	}
+
+	// Calculate parameters for zoompan filter
+	// fps=25 means 25 frames per second
+	fps := 25
+
+	// Zoompan filter creates a smooth zoom effect
+	// z='min(zoom+0.0015,1.5)': gradual zoom from 1x to 1.5x over the video
+	// d=1: hold each frame for 1 frame (25 fps means each frame is unique)
+	// s=WxH: output size
+	// fps=25: output frame rate
+	//
+	// The zoompan filter creates a smooth zoom effect:
+	// - Starts at zoom level 1 (no zoom)
+	// - Gradually zooms in by calculating zoom based on frame number
+	// - x and y center the zoomed area
+	filter := fmt.Sprintf("zoompan=z='min(zoom+0.0015,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=%dx%d:fps=%d,format=yuv420p", width, height, fps)
+
+	args := []string{
+		"-loop", "1", // Loop the input image
+		"-i", imagePath, // Input image
+		"-vf", filter, // Video filter with zoom
+		"-t", fmt.Sprintf("%.2f", duration), // Duration in seconds
+		"-c:v", "libx264", // Video codec
+		"-preset", "fast", // Encoding speed
+		"-pix_fmt", "yuv420p", // Pixel format for compatibility
+		"-y", // Overwrite output file
+		outputPath,
+	}
+
+	return p.runFFmpeg(ctx, args)
+}
+

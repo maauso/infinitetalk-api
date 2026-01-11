@@ -35,6 +35,7 @@ If you maintain or deploy provider workers, please check the corresponding hub r
 - **Parallel chunk processing** — configurable concurrency for faster throughput.
 - **Video stitching** — concatenates partial videos using `ffmpeg` (stream-copy first, re-encode fallback).
 - **Optional S3 upload** — return video inline or push to S3.
+- **V2V mode for long videos** — generates intermediate video with motion for Beam.cloud to prevent visual degradation in videos >1 minute.
 
 ## Requirements
 
@@ -122,6 +123,27 @@ curl -X POST http://localhost:8080/jobs \
     "force_offload": false
   }'
 ```
+
+#### Using Beam with V2V for Long Videos
+
+For videos longer than ~1 minute, use the `long_video` flag to enable V2V (Video-to-Video) mode. This generates an intermediate video with subtle motion (zoom/pan) to prevent visual degradation and color shifts:
+
+```bash
+curl -X POST http://localhost:8080/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image_base64": "<base64-encoded-image>",
+    "audio_base64": "<base64-encoded-wav>",
+    "width": 384,
+    "height": 384,
+    "provider": "beam",
+    "long_video": true,
+    "push_to_s3": false,
+    "force_offload": true
+  }'
+```
+
+**Note:** The `long_video` feature is only supported by the Beam provider. It internally converts the static image into a video with smooth zoom effects matching the audio duration before sending to the AI model.
 
 **Note:** The `provider` field is optional and defaults to `"runpod"`. Valid values are `"runpod"` or `"beam"`.
 

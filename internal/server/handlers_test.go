@@ -36,6 +36,16 @@ func (m *mockProcessor) JoinVideos(ctx context.Context, videoPaths []string, out
 	return args.Error(0)
 }
 
+func (m *mockProcessor) GetMediaDuration(ctx context.Context, path string) (float64, error) {
+	args := m.Called(ctx, path)
+	return args.Get(0).(float64), args.Error(1)
+}
+
+func (m *mockProcessor) GenerateMovingVideo(ctx context.Context, imagePath, outputPath string, duration float64, width, height int) error {
+	args := m.Called(ctx, imagePath, outputPath, duration, width, height)
+	return args.Error(0)
+}
+
 func (m *mockProcessor) ExtractLastFrame(ctx context.Context, videoPath string) ([]byte, error) {
 	args := m.Called(ctx, videoPath)
 	if args.Get(0) == nil {

@@ -27,10 +27,12 @@ func (s Status) IsTerminal() bool {
 
 // SubmitOptions contains optional parameters for submitting a task to Beam.
 type SubmitOptions struct {
-	Prompt       string // Prompt text for lip-sync
-	Width        int    // Video width in pixels
-	Height       int    // Video height in pixels
-	ForceOffload bool   // Whether to force offload
+	Prompt       string  // Prompt text for lip-sync
+	Width        int     // Video width in pixels
+	Height       int     // Video height in pixels
+	ForceOffload bool    // Whether to force offload
+	LongVideo    bool    // Whether to use V2V mode (Video-to-Video) for long videos
+	MaxFrame     int     // Maximum number of frames for V2V mode
 }
 
 // DefaultSubmitOptions returns the default options for submitting a task.
@@ -45,12 +47,16 @@ func DefaultSubmitOptions() SubmitOptions {
 
 // taskRequest represents the request body for Beam's task queue endpoint.
 type taskRequest struct {
+	InputType    string `json:"input_type,omitempty"`    // "image" or "video"
 	Prompt       string `json:"prompt,omitempty"`
 	Width        int    `json:"width,omitempty"`
 	Height       int    `json:"height,omitempty"`
+	MaxFrame     int    `json:"max_frame,omitempty"`     // Maximum frames for V2V
 	ForceOffload *bool  `json:"force_offload,omitempty"`
 	ImageBase64  string `json:"image_base64,omitempty"`
 	ImageURL     string `json:"image_url,omitempty"`
+	VideoBase64  string `json:"video_base64,omitempty"`  // For V2V mode
+	VideoURL     string `json:"video_url,omitempty"`     // For V2V mode
 	WavBase64    string `json:"wav_base64,omitempty"`
 	WavURL       string `json:"wav_url,omitempty"`
 }

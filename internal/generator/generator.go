@@ -34,6 +34,7 @@ type SubmitOptions struct {
 	Width        int    // Video width in pixels
 	Height       int    // Video height in pixels
 	ForceOffload bool   // Whether to force offload (supported by both Beam and RunPod)
+	LongVideo    bool   // Whether to use V2V mode for long videos (Beam only)
 }
 
 // PollResult contains the result of polling a job's status.

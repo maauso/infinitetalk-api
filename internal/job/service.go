@@ -63,6 +63,8 @@ type ProcessVideoInput struct {
 	DryRun bool
 	// ForceOffload forces offload on the provider. Defaults to true if not specified.
 	ForceOffload bool
+	// LongVideo enables V2V mode for long videos (Beam only).
+	LongVideo bool
 }
 
 // ProcessVideoOutput contains the result of video processing.
@@ -155,7 +157,7 @@ func (s *ProcessVideoService) getGenerator(provider Provider) (generator.Generat
 		if s.beamClient == nil {
 			return nil, ErrBeamClientNotInitialized
 		}
-		return generator.NewBeamAdapter(s.beamClient), nil
+		return generator.NewBeamAdapter(s.beamClient).WithProcessor(s.processor), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrInvalidProvider, provider)
 	}
@@ -410,7 +412,7 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 	}
 
 	// Step 5: Process chunks sequentially with frame continuity
-	videoPaths, err := s.processChunksSequential(ctx, job, gen, resizedImageB64, audioChunks, input.Width, input.Height, input.ForceOffload)
+	videoPaths, err := s.processChunksSequential(ctx, job, gen, resizedImageB64, audioChunks, input.Width, input.Height, input.ForceOffload, input.LongVideo)
 	if err != nil {
 		s.logger.Error("failed to process chunks",
 			slog.String("job_id", job.ID),
@@ -510,6 +512,7 @@ func (s *ProcessVideoService) processChunksSequential(
 	audioChunks []string,
 	width, height int,
 	forceOffload bool,
+	longVideo bool,
 ) ([]string, error) {
 	videoPaths := make([]string, 0, len(audioChunks))
 
@@ -529,7 +532,7 @@ func (s *ProcessVideoService) processChunksSequential(
 
 		// Process this chunk with the original image
 		videoPath, err := s.processChunkWithGenerator(
-			ctx, job, gen, i, initialImageB64, chunkPath, width, height, forceOffload,
+			ctx, job, gen, i, initialImageB64, chunkPath, width, height, forceOffload, longVideo,
 		)
 
 		if err != nil {
@@ -560,6 +563,7 @@ func (s *ProcessVideoService) processChunkWithGenerator(
 	imageB64, audioPath string,
 	width, height int,
 	forceOffload bool,
+	longVideo bool,
 ) (string, error) {
 	// Update chunk status to processing
 	s.updateChunkStatus(job, idx, ChunkStatusProcessing, "")
@@ -584,6 +588,7 @@ func (s *ProcessVideoService) processChunkWithGenerator(
 		Width:        width,
 		Height:       height,
 		ForceOffload: forceOffload,
+		LongVideo:    longVideo,
 	}
 	providerJobID, err := gen.Submit(ctx, imageB64, audioB64, submitOpts)
 	if err != nil {
