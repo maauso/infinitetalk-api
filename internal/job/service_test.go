@@ -251,7 +251,7 @@ func TestProcessVideoService_Process_Success(t *testing.T) {
 	}), mock.Anything).Return("/tmp/chunk_0.mp4", nil).Once()
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Run(func(args mock.Arguments) {
 			// Create the resized image file so fileToBase64 can read it
 			dst := args.Get(2).(string)
@@ -355,7 +355,7 @@ func TestProcessVideoService_Process_ResizeImageFails(t *testing.T) {
 	storageClient.On("SaveTemp", mock.Anything, "audio.wav", mock.Anything).Return("/tmp/audio.wav", nil).Once()
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Return(errors.New("resize error")).Once()
 
 	output, err := svc.Process(ctx, input)
@@ -390,7 +390,7 @@ func TestProcessVideoService_Process_SplitAudioFails(t *testing.T) {
 	storageClient.On("SaveTemp", mock.Anything, "audio.wav", mock.Anything).Return("/tmp/audio.wav", nil).Once()
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Run(func(args mock.Arguments) {
 			dst := args.Get(2).(string)
 			_ = os.WriteFile(dst, imageData, 0644)
@@ -434,7 +434,7 @@ func TestProcessVideoService_Process_RunPodSubmitFails(t *testing.T) {
 	storageClient.On("SaveTemp", mock.Anything, "audio.wav", mock.Anything).Return("/tmp/audio.wav", nil).Once()
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Run(func(args mock.Arguments) {
 			dst := args.Get(2).(string)
 			_ = os.WriteFile(dst, imageData, 0644)
@@ -486,7 +486,7 @@ func TestProcessVideoService_Process_RunPodPollFails(t *testing.T) {
 	storageClient.On("SaveTemp", mock.Anything, "audio.wav", mock.Anything).Return("/tmp/audio.wav", nil).Once()
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Run(func(args mock.Arguments) {
 			dst := args.Get(2).(string)
 			_ = os.WriteFile(dst, imageData, 0644)
@@ -545,7 +545,7 @@ func TestProcessVideoService_Process_JoinVideosFails(t *testing.T) {
 	}), mock.Anything).Return("/tmp/chunk_0.mp4", nil).Once()
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Run(func(args mock.Arguments) {
 			dst := args.Get(2).(string)
 			_ = os.WriteFile(dst, imageData, 0644)
@@ -610,7 +610,7 @@ func TestProcessVideoService_Process_WithS3Upload(t *testing.T) {
 	}), mock.Anything).Return("https://s3.example.com/videos/output.mp4", nil).Once()
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Run(func(args mock.Arguments) {
 			dst := args.Get(2).(string)
 			_ = os.WriteFile(dst, imageData, 0644)
@@ -677,7 +677,7 @@ func TestProcessVideoService_Process_MultipleChunks(t *testing.T) {
 	}), mock.Anything).Return("/tmp/chunk.mp4", nil).Times(3)
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Run(func(args mock.Arguments) {
 			dst := args.Get(2).(string)
 			_ = os.WriteFile(dst, imageData, 0644)
@@ -746,7 +746,7 @@ func TestProcessVideoService_Process_ContextCancellation(t *testing.T) {
 	storageClient.On("SaveTemp", mock.Anything, "audio.wav", mock.Anything).Return("/tmp/audio.wav", nil).Once()
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Run(func(args mock.Arguments) {
 			dst := args.Get(2).(string)
 			_ = os.WriteFile(dst, imageData, 0644)
@@ -897,7 +897,7 @@ func TestProcessVideoService_Process_DryRun(t *testing.T) {
 	storageClient.On("SaveTemp", mock.Anything, "audio.wav", mock.Anything).Return("/tmp/audio.wav", nil).Once()
 	storageClient.On("CleanupTemp", mock.Anything, mock.Anything).Return(nil)
 
-	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 384, 576).
+	processor.On("ResizeImageWithPadding", mock.Anything, "/tmp/image.png", mock.Anything, 1024, 1024).
 		Run(func(args mock.Arguments) {
 			dst := args.Get(2).(string)
 			_ = os.WriteFile(dst, imageData, 0644)
