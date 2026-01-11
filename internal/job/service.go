@@ -325,8 +325,12 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 	)
 
 	// Step 3: Resize image with padding
+	// Image is always resized to 1024x1024 (optimal resolution for lip-sync model)
+	// The input.Width and input.Height are used only for output video dimensions
+	const imageResizeWidth = 1024
+	const imageResizeHeight = 1024
 	resizedImagePath := filepath.Join(filepath.Dir(imagePath), fmt.Sprintf("resized_%s.png", job.ID))
-	if err := s.processor.ResizeImageWithPadding(ctx, imagePath, resizedImagePath, input.Width, input.Height); err != nil {
+	if err := s.processor.ResizeImageWithPadding(ctx, imagePath, resizedImagePath, imageResizeWidth, imageResizeHeight); err != nil {
 		s.logger.Error("failed to resize image",
 			slog.String("job_id", job.ID),
 			slog.String("error", err.Error()),
@@ -347,8 +351,10 @@ func (s *ProcessVideoService) processJob(ctx context.Context, job *Job, input Pr
 
 	s.logger.Info("image resized",
 		slog.String("job_id", job.ID),
-		slog.Int("width", input.Width),
-		slog.Int("height", input.Height),
+		slog.Int("image_width", imageResizeWidth),
+		slog.Int("image_height", imageResizeHeight),
+		slog.Int("video_width", input.Width),
+		slog.Int("video_height", input.Height),
 	)
 
 	// Step 4: Split audio into chunks
