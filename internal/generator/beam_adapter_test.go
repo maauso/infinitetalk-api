@@ -157,3 +157,52 @@ func TestBeamAdapter_DownloadOutput_Error(t *testing.T) {
 	require.Error(t, err)
 	mockClient.AssertExpectations(t)
 }
+
+func TestBeamAdapter_Submit_V2V_WithoutProcessor(t *testing.T) {
+	ctx := context.Background()
+	mockClient := &mockBeamClient{}
+	adapter := NewBeamAdapter(mockClient)
+	// Don't set processor
+
+	imageB64 := "base64image"
+	audioB64 := "base64audio"
+	opts := SubmitOptions{
+		Prompt:       "test prompt",
+		Width:        384,
+		Height:       384,
+		ForceOffload: true,
+		LongVideo:    true, // Enable V2V mode
+	}
+
+	// Should return error because processor is not set
+	_, err := adapter.Submit(ctx, imageB64, audioB64, opts)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrProcessorRequired)
+}
+
+func TestBeamAdapter_Submit_I2V_Mode(t *testing.T) {
+	ctx := context.Background()
+	mockClient := &mockBeamClient{}
+	adapter := NewBeamAdapter(mockClient)
+
+	imageB64 := "base64image"
+	audioB64 := "base64audio"
+	opts := SubmitOptions{
+		Prompt:       "test prompt",
+		Width:        384,
+		Height:       384,
+		ForceOffload: true,
+		LongVideo:    false, // I2V mode (default)
+	}
+
+	// Should use regular Submit (I2V)
+	mockClient.On("Submit", ctx, imageB64, audioB64, mock.MatchedBy(func(o beam.SubmitOptions) bool {
+		return o.Prompt == opts.Prompt && o.Width == opts.Width && o.Height == opts.Height && o.ForceOffload == opts.ForceOffload
+	})).Return("task-123", nil)
+
+	taskID, err := adapter.Submit(ctx, imageB64, audioB64, opts)
+	require.NoError(t, err)
+	assert.Equal(t, "task-123", taskID)
+	mockClient.AssertExpectations(t)
+}
+
